@@ -54,10 +54,6 @@ import org.simpleframework.xml.Attribute;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.google.gson.JsonSyntaxException;
-
 
 public class FireStepDriver extends AbstractSerialPortDriver implements Runnable {
 	private static final Logger logger = LoggerFactory.getLogger(FireStepDriver.class);
@@ -161,6 +157,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 			throws Exception {
 	    location = location.subtract(hm.getHeadOffsets());
 	    location = location.convertToUnits(LengthUnit.Millimeters);
+	    // Update the target location to handle any NaNs that were supplied
+	    location = location.derive(
+                Double.isNaN(location.getX()) ? this.x : location.getX(),
+                Double.isNaN(location.getY()) ? this.y : location.getY(),
+                Double.isNaN(location.getZ()) ? this.z : location.getZ(),
+                Double.isNaN(location.getRotation()) ? this.c : location.getRotation());
 	    
 	    int rotSteps = 0;
 	    RawStepTriplet rs = new RawStepTriplet(0,0,0);
@@ -168,7 +170,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    boolean moveRot = false;
 	    
 	    //Check if we've rotated
-	    if (Math.abs(location.getRotation() - c) >= 0.01)
+	    if (Math.abs(location.getRotation() - this.c) >= 0.01)
 	    {
 	    	moveRot = true;
 		    //Convert the rotation axis from degrees to steps
@@ -179,7 +181,11 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    }
 	    
 	    //Check if we've moved in XYZ
-	    Location currentLoc = new Location(LengthUnit.Millimeters, x, y, z, 0);
+	    /**
+	     * We must compare the target location to the current location. Target
+	     * location has to be created and take the NaN's into account. Use derive?
+	     */
+	    Location currentLoc = new Location(LengthUnit.Millimeters, this.x, this.y, this.z, 0);
 	    if (Math.abs(location.getXyzDistanceTo(currentLoc)) >= 0.01) {
 	    	moveXyz = true;
 		    logger.debug(String.format("moveTo Cartesian: X: %.3f, Y: %.3f, Z: %.3f",location.getX(), location.getY(),location.getZ() ));
