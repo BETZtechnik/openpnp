@@ -33,9 +33,11 @@ import javax.swing.border.TitledBorder;
 import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
 import org.openpnp.gui.components.ComponentDecorators;
 import org.openpnp.gui.support.AbstractConfigurationWizard;
+import org.openpnp.gui.support.DoubleConverter;
 import org.openpnp.gui.support.LengthConverter;
 import org.openpnp.gui.support.MutableLocationProxy;
 import org.openpnp.machine.reference.ReferenceNozzle;
+import org.openpnp.model.Configuration;
 
 import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
@@ -53,6 +55,9 @@ public class ReferenceNozzleConfigurationWizard extends
     private JPanel panelChanger;
     private JCheckBox chckbxChangerEnabled;
     private JCheckBox chckbxLimitRotationTo;
+    private JPanel panelSafeZ;
+    private JLabel lblSafeZ;
+    private JTextField textSafeZ;
 
     public ReferenceNozzleConfigurationWizard(ReferenceNozzle nozzle) {
         this.nozzle = nozzle;
@@ -99,6 +104,28 @@ public class ReferenceNozzleConfigurationWizard extends
 
         contentPanel.add(panelOffsets);
         
+        panelSafeZ = new JPanel();
+        contentPanel.add(panelSafeZ);
+        panelSafeZ.setBorder(new TitledBorder(new EtchedBorder(
+                EtchedBorder.LOWERED, null, null), "Safe Z",
+                TitledBorder.LEADING, TitledBorder.TOP, null,
+                new Color(0, 0, 0)));
+        panelSafeZ.setLayout(new FormLayout(new ColumnSpec[] {
+        		FormFactory.RELATED_GAP_COLSPEC,
+        		FormFactory.DEFAULT_COLSPEC,
+        		FormFactory.LABEL_COMPONENT_GAP_COLSPEC,
+        		ColumnSpec.decode("134px"),},
+        	new RowSpec[] {
+        		FormFactory.RELATED_GAP_ROWSPEC,
+        		RowSpec.decode("28px"),}));
+        
+        lblSafeZ = new JLabel("Safe Z");
+        panelSafeZ.add(lblSafeZ, "2, 2, left, center");
+        
+        textSafeZ = new JTextField();
+        panelSafeZ.add(textSafeZ, "4, 2, left, top");
+        textSafeZ.setColumns(10);
+        
         panelChanger = new JPanel();
         panelChanger.setBorder(new TitledBorder(new EtchedBorder(EtchedBorder.LOWERED, null, null), "Settings", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
         contentPanel.add(panelChanger);
@@ -128,6 +155,7 @@ public class ReferenceNozzleConfigurationWizard extends
 
     @Override
     public void createBindings() {
+        DoubleConverter doubleConverter = new DoubleConverter(Configuration.get().getLengthDisplayFormat());
         LengthConverter lengthConverter = new LengthConverter();
 
         MutableLocationProxy headOffsets = new MutableLocationProxy();
@@ -144,6 +172,10 @@ public class ReferenceNozzleConfigurationWizard extends
                 "selected");
         addWrappedBinding(nozzle, "limitRotation", chckbxLimitRotationTo,
                 "selected");
+
+        addWrappedBinding(nozzle, "safeZ", textSafeZ, "text", doubleConverter);
+
+        ComponentDecorators.decorateWithAutoSelect(textSafeZ);
 
         ComponentDecorators
                 .decorateWithAutoSelectAndLengthConversion(locationX);

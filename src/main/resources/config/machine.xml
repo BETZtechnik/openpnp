@@ -3,7 +3,7 @@
       <heads>
          <head class="org.openpnp.machine.reference.ReferenceHead" id="22964dce-252a-453e-8106-65db104a0763" name="H1">
             <nozzles>
-               <nozzle class="org.openpnp.machine.reference.ReferenceNozzle" id="69edd567-df6c-495a-9b30-2fcbf5c9742f" name="N1" pick-dwell-milliseconds="0" place-dwell-milliseconds="0" current-nozzle-tip-id="e092921a-2eef-449b-b340-aa3f40d8d791" changer-enabled="false">
+               <nozzle class="org.openpnp.machine.reference.ReferenceNozzle" id="69edd567-df6c-495a-9b30-2fcbf5c9742f" name="N1" pick-dwell-milliseconds="0" place-dwell-milliseconds="0" current-nozzle-tip-id="e092921a-2eef-449b-b340-aa3f40d8d791" changer-enabled="false"  safe-z="0.0">
                   <nozzle-tips>
                      <nozzle-tip class="org.openpnp.machine.reference.ReferenceNozzleTip" id="e092921a-2eef-449b-b340-aa3f40d8d791" name="NT1" allow-incompatible-packages="true">
                         <compatible-package-ids class="java.util.HashSet"/>
@@ -16,12 +16,12 @@
                </nozzle>
             </nozzles>
             <actuators>
-               <actuator class="org.openpnp.machine.reference.ReferenceActuator" id="5b8a8cbd-d6c1-4324-af8b-eba5f0444622" name="A1" index="0">
+               <actuator class="org.openpnp.machine.reference.ReferenceActuator" id="5b8a8cbd-d6c1-4324-af8b-eba5f0444622" name="A1" index="0" safe-z="0.0">
                   <head-offsets units="Millimeters" x="0.0" y="0.0" z="0.0" rotation="0.0"/>
                </actuator>
             </actuators>
             <cameras>
-               <camera class="org.openpnp.machine.reference.camera.ImageCamera" id="d66faf53-05e1-4629-baae-b614c5ed8320" name="C1" looking="Down" rotation="0.0" fps="24" width="640" height="480">
+               <camera class="org.openpnp.machine.reference.camera.ImageCamera" id="d66faf53-05e1-4629-baae-b614c5ed8320" name="C1" looking="Down" rotation="0.0" fps="24" width="640" height="480" safe-z="0.0">
                   <units-per-pixel units="Millimeters" x="0.04233" y="0.04233" z="0.0" rotation="0.0"/>
                   <vision-provider class="org.openpnp.machine.reference.vision.OpenCvVisionProvider"/>
                   <head-offsets units="Millimeters" x="0.0" y="0.0" z="0.0" rotation="0.0"/>

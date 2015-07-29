@@ -45,9 +45,7 @@ public class RotatableDeltaKinematicsCalculator {
 	
 	private double XYZ_FULL_STEPS_PER_ROTATION = 200.0;
 	private double XYZ_MICROSTEPS = 16.0;
-	private double SMALL_PULLEY_TEETH = 16.0;
-	private double BIG_PULLEY_TEETH = 150.0;
-	private double PULLEY_REDUCTION = BIG_PULLEY_TEETH/SMALL_PULLEY_TEETH;
+	private double PULLEY_REDUCTION = 9.429686699; //NOTE: This was calculated off of the actual pitch diameter of both pulleys. 
 	private double XYZ_STEPS = (XYZ_FULL_STEPS_PER_ROTATION*XYZ_MICROSTEPS*PULLEY_REDUCTION)/360.0;
 	
 	public class RotatableDeltaKinematicsException extends Exception {

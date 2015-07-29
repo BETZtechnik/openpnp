@@ -72,7 +72,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private boolean nozzleEnabled = false;
 	private boolean powerSupplyOn = false;
 	private RotatableDeltaKinematicsCalculator deltaCalc = new RotatableDeltaKinematicsCalculator();
-	
+
+    private int rawFeedrate = 12800; //12800 is FireStep's default feedrate
 	private double x, y, z, c;
 	private Thread readerThread;
 	private boolean disconnectRequested;
@@ -199,7 +200,6 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    //TODO: Set feedrate based in raw steps, based off of 'feedRateMmPerMinute' and 'speed'
 	    // 'mv' is maximum velocity (pulses/second), and the default is 12800.
 
-	    int rawFeedrate = 12800; //12800 is FireStep's default feedrate
 	    rawFeedrate = (int)((double)rawFeedrate * speed); //Multiply rawFeedrate by speed, which should be 0 to 1
 	    if (moveXyz){
 	    	if (moveRot){ // Cartesian move with rotation.  Feedrate is (TBD)
@@ -323,6 +323,78 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	        logger.error("disconnect()", e);
 	    }
 		disconnectRequested = false;
+	}
+	
+	public void doDetailedZProbe(ReferenceHeadMountable hm) throws Exception {
+		logger.debug("Performing Z probe...");
+
+		double Z_RAISE_BETWEEN_PROBINGS = 45; // TODO: Change this to goto safe Z!
+	    double DELTA_PROBABLE_RADIUS = 50.0; //214mm / 2 -10
+	    double LEFT_PROBE_BED_POSITION  = -DELTA_PROBABLE_RADIUS;
+	    double RIGHT_PROBE_BED_POSITION =  DELTA_PROBABLE_RADIUS;
+	    double BACK_PROBE_BED_POSITION  =  DELTA_PROBABLE_RADIUS;
+	    double FRONT_PROBE_BED_POSITION = -DELTA_PROBABLE_RADIUS;
+
+		int ACCURATE_BED_LEVELING_POINTS = 4;		
+		double ACCURATE_BED_LEVELING_GRID_Y = ((BACK_PROBE_BED_POSITION - FRONT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
+		double ACCURATE_BED_LEVELING_GRID_X = ((RIGHT_PROBE_BED_POSITION - LEFT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
+
+		double DELTA_PRINTABLE_RADIUS = 150.0;
+		double bed_level[][] = new double[ACCURATE_BED_LEVELING_POINTS][ACCURATE_BED_LEVELING_POINTS];
+
+		int probePointCounter = 0;
+		for (int yCount = 0; yCount < ACCURATE_BED_LEVELING_POINTS; yCount++) {
+			double yProbe = FRONT_PROBE_BED_POSITION
+					+ ACCURATE_BED_LEVELING_GRID_Y * yCount;
+			int xStart, xStop, xInc;
+			if ((yCount % 2) != 0) {
+				xStart = 0;
+				xStop = ACCURATE_BED_LEVELING_POINTS;
+				xInc = 1;
+			} else {
+				xStart = ACCURATE_BED_LEVELING_POINTS - 1;
+				xStop = -1;
+				xInc = -1;
+			}
+
+			for (int xCount = xStart; xCount != xStop; xCount += xInc) {
+				double xProbe = LEFT_PROBE_BED_POSITION	+ ACCURATE_BED_LEVELING_GRID_X * xCount;
+
+				// Avoid probing the corners (outside the round or hexagon print surface) on a delta printer.
+				double distance_from_center = Math.sqrt(xProbe * xProbe
+						+ yProbe * yProbe);
+				if (distance_from_center <= DELTA_PRINTABLE_RADIUS) {
+					// float z_before = probePointCounter == 0 ? Z_RAISE_BEFORE_PROBING : current_position[Z_AXIS] + Z_RAISE_BETWEEN_PROBINGS;
+					double z_before = probePointCounter == 0 ? 50 : z
+							+ Z_RAISE_BETWEEN_PROBINGS;
+					// Now do the Z probe
+					Location startPoint = new Location(LengthUnit.Millimeters, xProbe, yProbe, z_before, 0);
+					double measured_z = doZProbePoint(hm, startPoint);
+
+					bed_level[xCount][yCount] = measured_z;
+
+					probePointCounter++;
+				}
+			}
+		}
+	}
+
+	public double doZProbePoint(ReferenceHeadMountable hm, Location startPoint)  throws Exception {
+		this.moveTo(hm, startPoint, 1.0);
+		
+		//Determine point "below" the current target point.  Use inverse kinematics to get a point at Z=-20
+		Location targetPoint =  new Location(LengthUnit.Millimeters, startPoint.getX(), startPoint.getY(), -100, 0);
+		AngleTriplet at = deltaCalc.calculateDelta(targetPoint);
+		RawStepTriplet raw = deltaCalc.getRawSteps(at);
+		logger.debug(String.format("Do Z probe point : Location X=%.2f, Y=%.2f, Z=%.2f.",targetPoint.getX(), targetPoint.getY(), targetPoint.getZ() ));
+		logger.debug(String.format("Do Z probe point : Raw angle %d, %d, %d.", raw.x, raw.y, raw.z ));
+		
+		int probePin = 6; //TODO: Make this configurable in EMC02 class
+		//this.moveTo(hm,targetPoint, 1.0); //this is just for debugging, it's mutually exclusive with the prb command below...
+		String prbStr = new String(String.format("{'prb':{'x':%d,'y':%d,'z':%d,'pn':%d}}",raw.x, raw.y, raw.z, probePin));
+		sendJsonCommand( prbStr, 5000 );
+		logger.debug("Do Z probe point : Returning..");
+		return 0.0;
 	}
 	
 	private void setMotorDirection(boolean xyz, boolean rot, boolean enable) throws Exception {
@@ -512,4 +584,5 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	            new PropertySheetWizardAdapter(getConfigurationWizard())
 	    };
 	}
+
 }

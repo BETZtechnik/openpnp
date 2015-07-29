@@ -33,6 +33,8 @@ public class ReferenceCameraConfigurationWizard extends
     private JPanel panelGeneral;
     private JLabel lblRotation;
     private JTextField textFieldRotation;
+    private JLabel lblSafeZ;
+    private JTextField textSafeZ;
     
     
     public ReferenceCameraConfigurationWizard(ReferenceCamera referenceCamera) {
@@ -42,13 +44,16 @@ public class ReferenceCameraConfigurationWizard extends
         panelGeneral.setBorder(new TitledBorder(null, "General", TitledBorder.LEADING, TitledBorder.TOP, null, null));
         contentPanel.add(panelGeneral);
         panelGeneral.setLayout(new FormLayout(new ColumnSpec[] {
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,},
-            new RowSpec[] {
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,}));
+        		FormFactory.RELATED_GAP_COLSPEC,
+        		FormFactory.DEFAULT_COLSPEC,
+        		FormFactory.RELATED_GAP_COLSPEC,
+        		FormFactory.DEFAULT_COLSPEC,
+        		ColumnSpec.decode("default:grow"),},
+        	new RowSpec[] {
+        		FormFactory.RELATED_GAP_ROWSPEC,
+        		FormFactory.DEFAULT_ROWSPEC,
+        		FormFactory.RELATED_GAP_ROWSPEC,
+        		FormFactory.DEFAULT_ROWSPEC,}));
         
         lblRotation = new JLabel("Rotation");
         panelGeneral.add(lblRotation, "2, 2, right, default");
@@ -56,6 +61,13 @@ public class ReferenceCameraConfigurationWizard extends
         textFieldRotation = new JTextField();
         panelGeneral.add(textFieldRotation, "4, 2");
         textFieldRotation.setColumns(10);
+        
+        lblSafeZ = new JLabel("Safe Z");
+        panelGeneral.add(lblSafeZ, "2, 4, right, default");
+        
+        textSafeZ = new JTextField();
+        panelGeneral.add(textSafeZ, "4, 4, fill, default");
+        textSafeZ.setColumns(10);
 
         panelOff = new JPanel();
         contentPanel.add(panelOff);
@@ -111,7 +123,9 @@ public class ReferenceCameraConfigurationWizard extends
         addWrappedBinding(headOffsets, "lengthY", textFieldOffY, "text", lengthConverter);
         addWrappedBinding(headOffsets, "lengthZ", textFieldOffZ, "text", lengthConverter);
         addWrappedBinding(referenceCamera, "rotation", textFieldRotation, "text", doubleConverter);
+        addWrappedBinding(referenceCamera, "safeZ", textSafeZ, "text", doubleConverter);
 
+        ComponentDecorators.decorateWithAutoSelect(textSafeZ);
         ComponentDecorators.decorateWithAutoSelect(textFieldRotation);
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldOffX);
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldOffY);
