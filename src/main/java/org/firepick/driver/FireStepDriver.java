@@ -308,7 +308,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		
 	    //TODO: Allow configuration of modular tools 
 		setXyzMotorEnable(false);    // Disable all motors
-		setMotorDirection(true,true,false); // Set all motor directions to 'normal'
+        setMotorDirection(true,false,false); // Set X/Y motors to normal and rotation to inverted.
 		setHomingSpeed(200);				// Set the homing speed to something slower than default
 		sendJsonCommand("{'ape':34}", 100); // Set the enable pin for axis 'a' to tool 4 (this is an ugly hack and should go away)
 		// Turn off the stepper drivers
