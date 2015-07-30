@@ -63,6 +63,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Attribute
 	private double feedRateMmPerMinute;
 	
+    @Attribute(required=false)
+    private double xPlusScale = 1.025, xMinusScale = 1.025, yPlusScale = 1.04, yMinusScale = 1.02;
+    
 	//@Attribute
 	private double nozzleStepsPerDegree =  8.888888888;
 	private boolean nozzleEnabled = false;
@@ -163,6 +166,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 Double.isNaN(location.getY()) ? this.y : location.getY(),
                 Double.isNaN(location.getZ()) ? this.z : location.getZ(),
                 Double.isNaN(location.getRotation()) ? this.c : location.getRotation());
+        double xScale = location.getX() < 0 ? xMinusScale : xPlusScale;
+        double yScale = location.getY() < 0 ? yMinusScale : yPlusScale;
+        Location scaledLocation = location.multiply(xScale, yScale, 1.0, 1.0);
 	    
 	    int rotSteps = 0;
 	    RawStepTriplet rs = new RawStepTriplet(0,0,0);
@@ -170,11 +176,11 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    boolean moveRot = false;
 	    
 	    //Check if we've rotated
-	    if (Math.abs(location.getRotation() - this.c) >= 0.01)
+	    if (Math.abs(scaledLocation.getRotation() - this.c) >= 0.01)
 	    {
 	    	moveRot = true;
 		    //Convert the rotation axis from degrees to steps
-		    rotSteps = (int)(location.getRotation() * nozzleStepsPerDegree + 0.5d);
+		    rotSteps = (int)(scaledLocation.getRotation() * nozzleStepsPerDegree + 0.5d);
 		    if ((rotSteps >= 32000) || (rotSteps <= -32000)) {
 		    	throw new Error(String.format("FireStep: Rotation axis raw position cannot exceed +/- 32000 steps",rotSteps));
 		    }
@@ -191,7 +197,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		    logger.debug(String.format("moveTo Cartesian: X: %.3f, Y: %.3f, Z: %.3f",location.getX(), location.getY(),location.getZ() ));
 		    
 		    // Calculate delta kinematics (returns angles)
-		    AngleTriplet angles = deltaCalc.calculateDelta(location);
+		    AngleTriplet angles = deltaCalc.calculateDelta(scaledLocation);
 		    logger.debug(String.format("moveTo Delta: X: %.3f, Y: %.3f, Z: %.3f",angles.x, angles.y,angles.z ));
 		    
 		    // Convert angles into raw steps
