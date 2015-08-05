@@ -45,14 +45,20 @@ import org.openpnp.gui.support.Wizard;
 import org.openpnp.machine.reference.ReferenceActuator;
 import org.openpnp.machine.reference.ReferenceHead;
 import org.openpnp.machine.reference.ReferenceHeadMountable;
+import org.openpnp.machine.reference.ReferenceMachine;
 import org.openpnp.machine.reference.ReferenceNozzle;
 import org.openpnp.machine.reference.driver.AbstractSerialPortDriver;
+import org.openpnp.model.Configuration;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
 import org.openpnp.spi.PropertySheetHolder;
 import org.simpleframework.xml.Attribute;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 
 public class FireStepDriver extends AbstractSerialPortDriver implements Runnable {
@@ -80,6 +86,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private boolean connected;
 	private String connectedVersion;
 	private Queue<String> responseQueue = new ConcurrentLinkedQueue<String>();
+	private JsonParser parser = new JsonParser();
 	
 	@Override
 	public void setEnabled(boolean enabled) throws Exception {
@@ -390,6 +397,67 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 			}
 		}
 	}
+	
+	public JsonArray doNativeHexZprobe() throws Exception {
+	    ReferenceMachine machine = (ReferenceMachine) Configuration.get().getMachine();
+	    ReferenceHead head = (ReferenceHead) machine.getHeads().get(0);
+        ReferenceNozzle nozzle = (ReferenceNozzle) head.getNozzles().get(0);
+        
+	    home(head);
+	    moveTo(nozzle, new Location(LengthUnit.Millimeters), 1.0);
+	    
+        sendJsonCommand("{'systo':1}", 10000);
+        
+        
+        
+        logger.debug("Starting dimensions:");
+        sendJsonCommand(String.format("{'dim':''}"), 10000);
+        sendJsonCommand(String.format("{ 'dim' : { 'e' : %f, 'f' : %f, 'gr' : %f, 'ha1' : %f, 'ha2' : %f, 'ha3' : %f, 'mi' : %d, 're' : %f, 'rf' : %f, 'st' : %d }}", 
+                deltaCalc.getE(),
+                deltaCalc.getF(),
+                deltaCalc.getGr(),
+                deltaCalc.getHa1(),
+                deltaCalc.getHa2(),
+                deltaCalc.getHa3(),
+                (int) deltaCalc.getMi(),
+                deltaCalc.getRe(),
+                deltaCalc.getRf(),
+                (int) deltaCalc.getSt()
+                ), 10000);
+        logger.debug("Final dimensions:");
+        sendJsonCommand(String.format("{'dim':''}"), 10000);
+        
+        
+        sendJsonCommand("{'prbz':''}", 10000);
+
+        sendJsonCommand("{'mov':{'rz':10,'a':0,'d':50}}", 10000);
+        sendJsonCommand("{'prbz':''}", 10000);
+        
+        sendJsonCommand("{'mov':{'rz':10,'a':60,'d':50}}", 10000);
+        sendJsonCommand("{'prbz':''}", 10000);
+        
+        sendJsonCommand("{'mov':{'rz':10,'a':120,'d':50}}", 10000);
+        sendJsonCommand("{'prbz':''}", 10000);
+        
+        sendJsonCommand("{'mov':{'rz':10,'a':180,'d':50}}", 10000);
+        sendJsonCommand("{'prbz':''}", 10000);
+        
+        sendJsonCommand("{'mov':{'rz':10,'a':240,'d':50}}", 10000);
+        sendJsonCommand("{'prbz':''}", 10000);
+        
+        sendJsonCommand("{'mov':{'rz':10,'a':300,'d':50}}", 10000);
+        sendJsonCommand("{'prbz':''}", 10000);
+        
+        sendJsonCommand("{'mov':{'rz':10,'a':0,'d':0}}", 10000);
+        sendJsonCommand("{'prb':''}", 10000);
+
+        sendJsonCommand("{'movz':0}", 10000);
+        List<JsonObject> responses = sendJsonCommand("{'dimpd':''}", 10000);
+        
+        sendJsonCommand("{'systo':0}", 10000);
+        
+        return responses.get(0).get("r").getAsJsonObject().get("dimpd").getAsJsonArray();
+	}
 
 	public double doZProbePoint(ReferenceHeadMountable hm, Location startPoint)  throws Exception {
 		this.moveTo(hm, startPoint, 1.0);
@@ -492,7 +560,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    }
 	}
 	
-	private void processStatusResponses(List<String> responses) {
+	private List<JsonObject> processStatusResponses(List<String> responses) {
+	    List<JsonObject> objects = new ArrayList<JsonObject>();
 		for (String response : responses) 
 		{
 			if (response.startsWith("FireStep")) {
@@ -502,16 +571,17 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 				connected = true;
 				logger.debug(String.format("Connected to FireStep Version: %s", connectedVersion));
 			}
-			else
-			{
-				//TODO: Debug returned stuff here
+			else {
+			    JsonObject o = (JsonObject) parser.parse(response);
+			    objects.add(o);
 			}
 		}
+		return objects;
 	}
 	
-	private void sendJsonCommand(String command, long timeout) throws Exception {
+	private List<JsonObject> sendJsonCommand(String command, long timeout) throws Exception {
 		List<String> responses = sendCommand(command.replaceAll("'", "\""), timeout);
-		processStatusResponses(responses);
+		return processStatusResponses(responses);
 	}
 	
 	private List<String> sendCommand(String command, long timeout) throws Exception {

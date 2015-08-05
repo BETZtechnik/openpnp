@@ -21,38 +21,29 @@ along with OpenPnP.  If not, see <http://www.gnu.org/licenses/>.
 
 package org.firepick.driver.wizards;
 
-import javax.swing.BoxLayout;
-import javax.swing.JLabel;
+import java.awt.event.ActionEvent;
+
+import javax.swing.AbstractAction;
+import javax.swing.Action;
+import javax.swing.JButton;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextPane;
 import javax.swing.border.TitledBorder;
 
 import org.firepick.driver.FireStepDriver;
-import org.openpnp.machine.reference.ReferenceNozzle;
 import org.openpnp.machine.reference.driver.wizards.AbstractSerialPortDriverConfigurationWizard;
 import org.openpnp.model.Configuration;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
-import org.openpnp.spi.Head;
-import org.openpnp.spi.Machine;
 import org.openpnp.spi.Nozzle;
 
+import com.google.gson.JsonArray;
+import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
-
-import javax.swing.JButton;
-import javax.swing.JOptionPane;
-import javax.swing.JTextField;
-import javax.swing.JComboBox;
-import javax.swing.DefaultComboBoxModel;
-
-import com.jgoodies.forms.factories.FormFactory;
-
-import javax.swing.JTable;
-import javax.swing.JTextPane;
-
-import java.awt.event.ActionListener;
-import java.awt.event.ActionEvent;
 
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
@@ -67,30 +58,39 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         contentPanel.add(panelCalibration);
         contentPanel.add(panelCalibration);
         panelCalibration.setLayout(new FormLayout(new ColumnSpec[] {
-        		ColumnSpec.decode("145px:grow"),},
-        	new RowSpec[] {
-        		RowSpec.decode("23px"),
-        		RowSpec.decode("pref:grow"),}));
+                FormFactory.RELATED_GAP_COLSPEC,
+                ColumnSpec.decode("default:grow"),},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                RowSpec.decode("default:grow"),}));
         
-        JButton btnBtnprobe = new JButton("Z Probe");
-        btnBtnprobe.addActionListener(new ActionListener() {
-        	public void actionPerformed(ActionEvent e) {
-        		final Nozzle nozzle = Configuration.get().getMachine().getHeads().get(0).getNozzles().get(0); //Assumes one head on the machine
-        		try {
-        			Location test = new Location(LengthUnit.Millimeters,0,0,0,0);
-        			FireStepDriverWizard.this.driver.doZProbePoint((ReferenceNozzle)nozzle, test);
-            		//FireStepDriverWizard.this.driver.doDetailedZProbe((ReferenceNozzle)nozzle);
-        		}
-        		catch (Exception e1){
-        			JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        		}
-        	}
-        });
-        panelCalibration.add(btnBtnprobe, "1, 1, left, top");
+        JButton btnProbe = new JButton(zProbe);
+        panelCalibration.add(btnProbe, "2, 2");
         
-        JTextPane txtpnProbeResults = new JTextPane();
-        txtpnProbeResults.setText("Probe Results");
-        panelCalibration.add(txtpnProbeResults, "1, 2, fill, fill");
+        JScrollPane scrollPane = new JScrollPane();
+        panelCalibration.add(scrollPane, "2, 4, fill, fill");
+        
+        textPane = new JTextPane();
+        scrollPane.setViewportView(textPane);
     }
-
+ 
+    @SuppressWarnings("serial")
+    private Action zProbe = new AbstractAction("Z Probe") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            final Nozzle nozzle = Configuration.get().getMachine().getHeads().get(0).getNozzles().get(0); //Assumes one head on the machine
+            try {
+                Location test = new Location(LengthUnit.Millimeters,0,0,0,0);
+                JsonArray result = driver.doNativeHexZprobe();
+                textPane.setText(textPane.getText() + result.toString() + "\r\n");
+                //FireStepDriverWizard.this.driver.doDetailedZProbe((ReferenceNozzle)nozzle);
+            }
+            catch (Exception e1){
+                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    };
+    private JTextPane textPane;
 }

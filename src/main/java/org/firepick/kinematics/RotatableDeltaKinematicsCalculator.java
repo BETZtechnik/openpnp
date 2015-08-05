@@ -54,6 +54,46 @@ public class RotatableDeltaKinematicsCalculator {
 		}
 	}
 	
+	public double getRe() {
+	    return deltaRe;
+	}
+	
+	public double getRf() {
+	    return deltaRf;
+	}
+	
+	public double getE() {
+	    return deltaE;
+	}
+	
+	public double getF() {
+	    return deltaF;
+	}
+	
+	public double getGr() {
+	    return PULLEY_REDUCTION;
+	}
+	
+    public double getHa1() {
+        return HOME_ANGLE_X;
+    }
+    
+    public double getHa2() {
+        return HOME_ANGLE_Y;
+    }
+    
+    public double getHa3() {
+        return HOME_ANGLE_Z;
+    }
+    
+    public double getMi() {
+        return XYZ_MICROSTEPS;
+    }
+    
+    public double getSt() {
+        return XYZ_FULL_STEPS_PER_ROTATION;
+    }
+    
 	//Return raw steps, given an angle
 	public int getRawStepsFromAngle(double angle)
 	{
