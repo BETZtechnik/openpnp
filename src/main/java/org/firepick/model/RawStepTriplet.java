@@ -32,4 +32,9 @@ public class RawStepTriplet
 	public int x = 0;
 	public int y = 0;
 	public int z = 0;
+	
+    @Override
+    public String toString() {
+        return "RawStepTriplet [x=" + x + ", y=" + y + ", z=" + z + "]";
+    }
 }

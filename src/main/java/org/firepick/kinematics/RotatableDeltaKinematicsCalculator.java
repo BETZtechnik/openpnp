@@ -90,6 +90,10 @@ public class RotatableDeltaKinematicsCalculator {
         return XYZ_MICROSTEPS;
     }
     
+    public double getZo() {
+        return Z_CALC_OFFSET;
+    }
+    
     public double getSt() {
         return XYZ_FULL_STEPS_PER_ROTATION;
     }
@@ -98,6 +102,22 @@ public class RotatableDeltaKinematicsCalculator {
 	public int getRawStepsFromAngle(double angle)
 	{
 		return (int)(angle * XYZ_STEPS + 0.5d);
+	}
+	
+	public double getAngleFromRawSteps(int steps) {
+	    return (steps - 0.5d) / XYZ_STEPS;
+	}
+	
+	public AngleTriplet getAnglesFromRawSteps(RawStepTriplet steps) {
+	    return new AngleTriplet(getAngleFromRawSteps(steps.x), getAngleFromRawSteps(steps.y), getAngleFromRawSteps(steps.z));
+	}
+	
+	public Location getLocation(RawStepTriplet steps) throws Exception {
+	    return delta_calcForward(getAnglesFromRawSteps(steps));
+	}
+	
+	public RawStepTriplet getRawSteps(Location location) throws Exception {
+	    return getRawSteps(calculateDelta(location));
 	}
 	
 	//Get the raw step home positions for the three axes

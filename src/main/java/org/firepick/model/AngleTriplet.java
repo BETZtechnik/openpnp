@@ -34,4 +34,10 @@ public class AngleTriplet
 	public double y = 0;
 	public double z = 0;
 	public boolean successfulCalc = false;
+	
+    @Override
+    public String toString() {
+        return "AngleTriplet [x=" + x + ", y=" + y + ", z=" + z
+                + ", successfulCalc=" + successfulCalc + "]";
+    }
 }
