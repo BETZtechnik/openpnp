@@ -72,6 +72,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
     @Attribute(required=false)
     private double xPlusScale = 1.025, xMinusScale = 1.025, yPlusScale = 1.04, yMinusScale = 1.02;
     
+    @Attribute(required=false)
+    private boolean useFireStepKinematics = false;
+    
 	//@Attribute
 	private double nozzleStepsPerDegree =  8.888888888;
 	private boolean nozzleEnabled = false;
@@ -138,15 +141,16 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
 	@Override
 	public void home(ReferenceHead head) throws Exception {
-		RawStepTriplet rs = deltaCalc.getHomePosRaw();
-		sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
-		
-		Location homLoc = deltaCalc.getHomePosCartesian();
-		logger.debug(String.format("Home position: X=%.2f, Y=%.2f, Z=%.2f",homLoc.getX(),homLoc.getY(),homLoc.getZ() ));
-		x = homLoc.getX();
-		y = homLoc.getY();
-		z = homLoc.getZ();
-		//TODO: Fire off head event to get the DRO to update to the new values
+	    if (useFireStepKinematics) {
+            RawStepTriplet rs = deltaCalc.getHomePosRaw();
+            sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
+            setLocation(deltaCalc.getHomePosCartesian());
+	    }
+	    else {
+	        RawStepTriplet rs = deltaCalc.getHomePosRaw();
+	        sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
+	        setLocation(getFireStepLocation());
+	    }
 	}
 	
 	@Override
@@ -177,71 +181,15 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         double yScale = location.getY() < 0 ? yMinusScale : yPlusScale;
         Location scaledLocation = location.multiply(xScale, yScale, 1.0, 1.0);
 	    
-	    int rotSteps = 0;
-	    RawStepTriplet rs = new RawStepTriplet(0,0,0);
-	    boolean moveXyz = false;
-	    boolean moveRot = false;
-	    
-	    //Check if we've rotated
-	    if (Math.abs(scaledLocation.getRotation() - this.c) >= 0.01)
-	    {
-	    	moveRot = true;
-		    //Convert the rotation axis from degrees to steps
-		    rotSteps = (int)(scaledLocation.getRotation() * nozzleStepsPerDegree + 0.5d);
-		    if ((rotSteps >= 32000) || (rotSteps <= -32000)) {
-		    	throw new Error(String.format("FireStep: Rotation axis raw position cannot exceed +/- 32000 steps",rotSteps));
-		    }
-	    }
-	    
-	    //Check if we've moved in XYZ
-	    /**
-	     * We must compare the target location to the current location. Target
-	     * location has to be created and take the NaN's into account. Use derive?
-	     */
-	    Location currentLoc = new Location(LengthUnit.Millimeters, this.x, this.y, this.z, 0);
-	    if (Math.abs(location.getXyzDistanceTo(currentLoc)) >= 0.01) {
-	    	moveXyz = true;
-		    logger.debug(String.format("moveTo Cartesian: X: %.3f, Y: %.3f, Z: %.3f",location.getX(), location.getY(),location.getZ() ));
-		    
-		    // Calculate delta kinematics (returns angles)
-		    AngleTriplet angles = deltaCalc.calculateDelta(scaledLocation);
-		    logger.debug(String.format("moveTo Delta: X: %.3f, Y: %.3f, Z: %.3f",angles.x, angles.y,angles.z ));
-		    
-		    // Convert angles into raw steps
-		    rs = deltaCalc.getRawSteps(angles);
-		    logger.debug(String.format("moveTo RawSteps: X: %d, Y: %d, Z: %d",rs.x, rs.y,rs.z ));
-	    }
-	    
-	    
-	    // Get feedrate in raw steps
-	    // Note that speed is defined by (maximum feed rate * speed) where speed is greater than 0 and typically less than or equal to 1. 
-	    // A speed of 0 means to move at the minimum possible speed.
-	    //TODO: Set feedrate based in raw steps, based off of 'feedRateMmPerMinute' and 'speed'
-	    // 'mv' is maximum velocity (pulses/second), and the default is 12800.
+        if (useFireStepKinematics) {
+            moveToFireStepKinematics(hm, scaledLocation, speed);
+        }
+        else {
+            moveToRaw(hm, scaledLocation, speed);
+        }
 
-	    rawFeedrate = (int)((double)rawFeedrate * speed); //Multiply rawFeedrate by speed, which should be 0 to 1
-	    if (moveXyz){
-	    	if (moveRot){ // Cartesian move with rotation.  Feedrate is (TBD)
-	    		logger.debug(String.format("moveTo: Cartesian move with rotation, feedrate=%d steps/second",rawFeedrate));
-	    		setRotMotorEnable(true);
-	    		sendJsonCommand(String.format("{'mov':{'x':%d,'y':%d,'z':%d, 'a':%d,'mv':%d}}",rs.x, rs.y, rs.z, rotSteps, rawFeedrate), 10000);
-	    	}
-	    	else{         // Cartesian move with no rotation.  Feedrate is just the cartesian feedrate
-	    		logger.debug(String.format("moveTo: Cartesian move, feedrate=%d steps/second",rawFeedrate));
-	    		sendJsonCommand(String.format("{'mov':{'x':%d,'y':%d,'z':%d,'mv':%d}}",rs.x, rs.y, rs.z, rawFeedrate), 10000);
-	    	}
-	    }
-	    else {
-	    	if (moveRot){ // Rotation, no Cartesian move.  Feedrate is just the rotation feedrate
-	    		setRotMotorEnable(true);
-	    		logger.debug(String.format("moveTo: Rotation move, feedrate=%d steps/second",rawFeedrate));
-	    		sendJsonCommand(String.format("{'mov':{'a':%d,'mv':%d}}",rotSteps, rawFeedrate), 10000);
-	    	}
-	    	else{         // No move, nothing to do
-	    		logger.debug("moveTo: No move, nothing to do");
-	    	}
-	    }
-	    	
+        // TODO: Since we handle the NaNs up top we can probably skip all
+        // these checks, but think about it a bit first.
 	    if (!Double.isNaN(location.getX())) {
 	        this.x = location.getX();
 	    }
@@ -256,6 +204,82 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    }
 	}
 	
+    public void moveToRaw(ReferenceHeadMountable hm, Location location, double speed)
+            throws Exception {
+        int rotSteps = 0;
+        RawStepTriplet rs = new RawStepTriplet(0,0,0);
+        boolean moveXyz = false;
+        boolean moveRot = false;
+        
+        //Check if we've rotated
+        if (Math.abs(location.getRotation() - this.c) >= 0.01)
+        {
+            moveRot = true;
+            //Convert the rotation axis from degrees to steps
+            rotSteps = (int)(location.getRotation() * nozzleStepsPerDegree + 0.5d);
+            if ((rotSteps >= 32000) || (rotSteps <= -32000)) {
+                throw new Error(String.format("FireStep: Rotation axis raw position cannot exceed +/- 32000 steps",rotSteps));
+            }
+        }
+        
+        //Check if we've moved in XYZ
+        /**
+         * We must compare the target location to the current location. Target
+         * location has to be created and take the NaN's into account. Use derive?
+         */
+        Location currentLoc = new Location(LengthUnit.Millimeters, this.x, this.y, this.z, 0);
+        if (Math.abs(location.getXyzDistanceTo(currentLoc)) >= 0.01) {
+            moveXyz = true;
+            logger.debug(String.format("moveTo Cartesian: X: %.3f, Y: %.3f, Z: %.3f",location.getX(), location.getY(),location.getZ() ));
+            
+            // Calculate delta kinematics (returns angles)
+            AngleTriplet angles = deltaCalc.calculateDelta(location);
+            logger.debug(String.format("moveTo Delta: X: %.3f, Y: %.3f, Z: %.3f",angles.x, angles.y,angles.z ));
+            
+            // Convert angles into raw steps
+            rs = deltaCalc.getRawSteps(angles);
+            logger.debug(String.format("moveTo RawSteps: X: %d, Y: %d, Z: %d",rs.x, rs.y,rs.z ));
+        }
+        
+        
+        // Get feedrate in raw steps
+        // Note that speed is defined by (maximum feed rate * speed) where speed is greater than 0 and typically less than or equal to 1. 
+        // A speed of 0 means to move at the minimum possible speed.
+        //TODO: Set feedrate based in raw steps, based off of 'feedRateMmPerMinute' and 'speed'
+        // 'mv' is maximum velocity (pulses/second), and the default is 12800.
+
+        rawFeedrate = (int)((double)rawFeedrate * speed); //Multiply rawFeedrate by speed, which should be 0 to 1
+        if (moveXyz){
+            if (moveRot){ // Cartesian move with rotation.  Feedrate is (TBD)
+                logger.debug(String.format("moveTo: Cartesian move with rotation, feedrate=%d steps/second",rawFeedrate));
+                setRotMotorEnable(true);
+                sendJsonCommand(String.format("{'mov':{'x':%d,'y':%d,'z':%d, 'a':%d,'mv':%d}}",rs.x, rs.y, rs.z, rotSteps, rawFeedrate), 10000);
+            }
+            else{         // Cartesian move with no rotation.  Feedrate is just the cartesian feedrate
+                logger.debug(String.format("moveTo: Cartesian move, feedrate=%d steps/second",rawFeedrate));
+                sendJsonCommand(String.format("{'mov':{'x':%d,'y':%d,'z':%d,'mv':%d}}",rs.x, rs.y, rs.z, rawFeedrate), 10000);
+            }
+        }
+        else {
+            if (moveRot){ // Rotation, no Cartesian move.  Feedrate is just the rotation feedrate
+                setRotMotorEnable(true);
+                logger.debug(String.format("moveTo: Rotation move, feedrate=%d steps/second",rawFeedrate));
+                sendJsonCommand(String.format("{'mov':{'a':%d,'mv':%d}}",rotSteps, rawFeedrate), 10000);
+            }
+            else{         // No move, nothing to do
+                logger.debug("moveTo: No move, nothing to do");
+            }
+        }
+    }
+    
+    public void moveToFireStepKinematics(ReferenceHeadMountable hm, Location location, double speed)
+            throws Exception {
+        sendJsonCommand(String.format("{'mov':{'x':%f,'y':%f,'z':%f}}", 
+                -location.getX(), 
+                -location.getY(), 
+                location.getZ()
+                ), 10000);
+    }
 	
 	@Override
 	public void pick(ReferenceNozzle nozzle) throws Exception {
@@ -315,7 +339,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		
 	    //TODO: Allow configuration of modular tools 
 		setXyzMotorEnable(false);    // Disable all motors
-        setMotorDirection(true,false,false); // Set X/Y motors to normal and rotation to inverted.
+        setFireStepKinematicsEnabled(useFireStepKinematics);
+        setMotorDirection(true, false, false); // Set X/Y motors to normal and rotation to inverted.
 		setHomingSpeed(200);				// Set the homing speed to something slower than default
 		sendJsonCommand("{'ape':34}", 100); // Set the enable pin for axis 'a' to tool 4 (this is an ugly hack and should go away)
 		// Turn off the stepper drivers
@@ -344,58 +369,83 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		disconnectRequested = false;
 	}
 	
-	public void doDetailedZProbe(ReferenceHeadMountable hm) throws Exception {
-		logger.debug("Performing Z probe...");
+	public double[][] doDetailedZProbe(ReferenceHeadMountable hm) throws Exception {
+        logger.debug("Performing Z probe...");
+        
+        double DELTA_PROBABLE_RADIUS = 90.0; //214mm / 2 -10
+        double LEFT_PROBE_BED_POSITION  = -DELTA_PROBABLE_RADIUS;
+        double RIGHT_PROBE_BED_POSITION =  DELTA_PROBABLE_RADIUS;
+        double BACK_PROBE_BED_POSITION  =  DELTA_PROBABLE_RADIUS;
+        double FRONT_PROBE_BED_POSITION = -DELTA_PROBABLE_RADIUS;
 
-		double Z_RAISE_BETWEEN_PROBINGS = 45; // TODO: Change this to goto safe Z!
-	    double DELTA_PROBABLE_RADIUS = 50.0; //214mm / 2 -10
-	    double LEFT_PROBE_BED_POSITION  = -DELTA_PROBABLE_RADIUS;
-	    double RIGHT_PROBE_BED_POSITION =  DELTA_PROBABLE_RADIUS;
-	    double BACK_PROBE_BED_POSITION  =  DELTA_PROBABLE_RADIUS;
-	    double FRONT_PROBE_BED_POSITION = -DELTA_PROBABLE_RADIUS;
+        int ACCURATE_BED_LEVELING_POINTS = 9;       
+        double ACCURATE_BED_LEVELING_GRID_Y = ((BACK_PROBE_BED_POSITION - FRONT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
+        double ACCURATE_BED_LEVELING_GRID_X = ((RIGHT_PROBE_BED_POSITION - LEFT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
 
-		int ACCURATE_BED_LEVELING_POINTS = 4;		
-		double ACCURATE_BED_LEVELING_GRID_Y = ((BACK_PROBE_BED_POSITION - FRONT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
-		double ACCURATE_BED_LEVELING_GRID_X = ((RIGHT_PROBE_BED_POSITION - LEFT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
+        double bed_level[][] = new double[ACCURATE_BED_LEVELING_POINTS][ACCURATE_BED_LEVELING_POINTS];
+        
+        // First, do a probe at 0,0 to determine the approximate bed height and then work
+        // slightly above it.
+        Location startLocation = doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0));
+        startLocation = startLocation.add(new Location(LengthUnit.Millimeters, 0, 0, 20, 0));
 
-		double DELTA_PRINTABLE_RADIUS = 150.0;
-		double bed_level[][] = new double[ACCURATE_BED_LEVELING_POINTS][ACCURATE_BED_LEVELING_POINTS];
+        for (int yCount = 0; yCount < ACCURATE_BED_LEVELING_POINTS; yCount++) {
+            double yProbe = FRONT_PROBE_BED_POSITION
+                    + ACCURATE_BED_LEVELING_GRID_Y * yCount;
+            int xStart, xStop, xInc;
+            if ((yCount % 2) != 0) {
+                xStart = 0;
+                xStop = ACCURATE_BED_LEVELING_POINTS;
+                xInc = 1;
+            } else {
+                xStart = ACCURATE_BED_LEVELING_POINTS - 1;
+                xStop = -1;
+                xInc = -1;
+            }
 
-		int probePointCounter = 0;
-		for (int yCount = 0; yCount < ACCURATE_BED_LEVELING_POINTS; yCount++) {
-			double yProbe = FRONT_PROBE_BED_POSITION
-					+ ACCURATE_BED_LEVELING_GRID_Y * yCount;
-			int xStart, xStop, xInc;
-			if ((yCount % 2) != 0) {
-				xStart = 0;
-				xStop = ACCURATE_BED_LEVELING_POINTS;
-				xInc = 1;
-			} else {
-				xStart = ACCURATE_BED_LEVELING_POINTS - 1;
-				xStop = -1;
-				xInc = -1;
-			}
+            for (int xCount = xStart; xCount != xStop; xCount += xInc) {
+                double xProbe = LEFT_PROBE_BED_POSITION + ACCURATE_BED_LEVELING_GRID_X * xCount;
 
-			for (int xCount = xStart; xCount != xStop; xCount += xInc) {
-				double xProbe = LEFT_PROBE_BED_POSITION	+ ACCURATE_BED_LEVELING_GRID_X * xCount;
-
-				// Avoid probing the corners (outside the round or hexagon print surface) on a delta printer.
-				double distance_from_center = Math.sqrt(xProbe * xProbe
-						+ yProbe * yProbe);
-				if (distance_from_center <= DELTA_PRINTABLE_RADIUS) {
-					// float z_before = probePointCounter == 0 ? Z_RAISE_BEFORE_PROBING : current_position[Z_AXIS] + Z_RAISE_BETWEEN_PROBINGS;
-					double z_before = probePointCounter == 0 ? 50 : z
-							+ Z_RAISE_BETWEEN_PROBINGS;
-					// Now do the Z probe
-					Location startPoint = new Location(LengthUnit.Millimeters, xProbe, yProbe, z_before, 0);
-					double measured_z = doZProbePoint(hm, startPoint);
-
-					bed_level[xCount][yCount] = measured_z;
-
-					probePointCounter++;
-				}
-			}
-		}
+                // Avoid probing the corners (outside the round or hexagon print surface) on a delta printer.
+                double distance_from_center = Math.sqrt(xProbe * xProbe + yProbe * yProbe);
+                if (distance_from_center <= DELTA_PROBABLE_RADIUS) {
+                    // Now do the Z probe
+                    Location probedLocation = new Location(LengthUnit.Millimeters, xProbe, yProbe, startLocation.getZ(), 0);
+                    double measured_z = 0;
+                    for (int i = 0; i < 5; i++) {
+                        measured_z = doZprobePoint(hm, probedLocation).getZ();
+                    }
+                    bed_level[xCount][yCount] = measured_z;
+                }
+                else {
+                    bed_level[xCount][yCount] = Double.NaN;
+                }
+            }
+        }
+        hm.moveTo(startLocation, 1.0);
+        return bed_level;
+	}
+	
+	private void setFireStepKinematicsEnabled(boolean enabled) throws Exception {
+	    if (enabled) {
+	        sendJsonCommand("{'systo':1}", 3000);
+	        sendJsonCommand(String.format("{ 'dim' : { 'e' : %f, 'f' : %f, 'gr' : %f, 'ha1' : %f, 'ha2' : %f, 'ha3' : %f, 'mi' : %d, 're' : %f, 'rf' : %f, 'st' : %d, 'zo' : %f}}", 
+	                deltaCalc.getE(),
+	                deltaCalc.getF(),
+	                deltaCalc.getGr(),
+	                deltaCalc.getHa1(),
+	                deltaCalc.getHa2(),
+	                deltaCalc.getHa3(),
+	                (int) deltaCalc.getMi(),
+	                deltaCalc.getRe(),
+	                deltaCalc.getRf(),
+	                (int) deltaCalc.getSt(),
+	                -deltaCalc.getZo()
+	                ), 3000);
+	    }
+	    else {
+	        sendJsonCommand("{'systo':0}", 3000);
+	    }
 	}
 	
 	public JsonArray doNativeHexZprobe() throws Exception {
@@ -405,29 +455,11 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         
 	    home(head);
 	    moveTo(nozzle, new Location(LengthUnit.Millimeters), 1.0);
+
+	    if (!useFireStepKinematics) {
+	        setFireStepKinematicsEnabled(true);
+	    }
 	    
-        sendJsonCommand("{'systo':1}", 10000);
-        
-        
-        
-        logger.debug("Starting dimensions:");
-        sendJsonCommand(String.format("{'dim':''}"), 10000);
-        sendJsonCommand(String.format("{ 'dim' : { 'e' : %f, 'f' : %f, 'gr' : %f, 'ha1' : %f, 'ha2' : %f, 'ha3' : %f, 'mi' : %d, 're' : %f, 'rf' : %f, 'st' : %d }}", 
-                deltaCalc.getE(),
-                deltaCalc.getF(),
-                deltaCalc.getGr(),
-                deltaCalc.getHa1(),
-                deltaCalc.getHa2(),
-                deltaCalc.getHa3(),
-                (int) deltaCalc.getMi(),
-                deltaCalc.getRe(),
-                deltaCalc.getRf(),
-                (int) deltaCalc.getSt()
-                ), 10000);
-        logger.debug("Final dimensions:");
-        sendJsonCommand(String.format("{'dim':''}"), 10000);
-        
-        
         sendJsonCommand("{'prbz':''}", 10000);
 
         sendJsonCommand("{'mov':{'rz':10,'a':0,'d':50}}", 10000);
@@ -454,12 +486,82 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         sendJsonCommand("{'movz':0}", 10000);
         List<JsonObject> responses = sendJsonCommand("{'dimpd':''}", 10000);
         
-        sendJsonCommand("{'systo':0}", 10000);
+        if (!useFireStepKinematics) {
+            setFireStepKinematicsEnabled(false);
+        }
         
         return responses.get(0).get("r").getAsJsonObject().get("dimpd").getAsJsonArray();
 	}
+	
+	/**
+	 * Get the machine's current location according to FireStep.
+	 * @return
+	 * @throws Exception
+	 */
+	public Location getFireStepLocation() throws Exception {
+	    JsonObject o = sendJsonCommand("{'mpo':''}", 1000).get(0).get("r").getAsJsonObject().get("mpo").getAsJsonObject();
+	    return parseLocationFromSteps(o, new String[] { "1", "2", "3" });
+	}
+	
+	/**
+	 * Set the internal state of the driver's location to the given location.
+	 * @param location
+	 * @throws Exception
+	 */
+	public void setLocation(Location location) throws Exception {
+	    this.x = location.getX();
+	    this.y = location.getY();
+	    this.z = location.getZ();
+	    ReferenceMachine machine = (ReferenceMachine) Configuration.get().getMachine();
+	    ReferenceHead head = (ReferenceHead) machine.getHeads().get(0);
+        machine.fireMachineHeadActivity(head);
+	}
+	
+	/**
+	 * Given a JsonObject containing step values for x, y and z, perform
+	 * delta kinematics to determine the given cartesian location and return
+	 * it. 
+	 * @param o
+	 * @return
+	 * @throws Exception
+	 */
+	private Location parseLocationFromSteps(JsonObject o, String[] fields) throws Exception {
+        int x = o.get(fields[0]).getAsInt();
+        int y = o.get(fields[1]).getAsInt();
+        int z = o.get(fields[2]).getAsInt();
+        return deltaCalc.getLocation(new RawStepTriplet(x, y, z));
+	}
+	
+	public List<Location> doZprobeHex(ReferenceHeadMountable hm) throws Exception {
+	    List<Location> locations = new ArrayList<Location>();
+	    double radius = 50;
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0)));
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0)));
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(60)));
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(120)));
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(180)));
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(240)));
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(300)));
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0)));
+        return locations;
+	}
 
-	public double doZProbePoint(ReferenceHeadMountable hm, Location startPoint)  throws Exception {
+    public List<Location> doZprobeCorners(ReferenceHeadMountable hm) throws Exception {
+        double distance = 85;
+        List<Location> locations = new ArrayList<Location>();
+        // front left
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, -distance, -distance, 0, 0)));
+        // front right
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, distance, -distance, 0, 0)));
+        // back right
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, distance, distance, 0, 0)));
+        // back left
+        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, -distance, distance, 0, 0)));
+        hm.moveTo(new Location(LengthUnit.Millimeters, 0, 0, 0, 0), 1.0);
+        return locations;
+    }
+
+	public Location doZprobePoint(ReferenceHeadMountable hm, Location startPoint)  throws Exception {
 		this.moveTo(hm, startPoint, 1.0);
 		
 		//Determine point "below" the current target point.  Use inverse kinematics to get a point at Z=-20
@@ -472,9 +574,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		int probePin = 6; //TODO: Make this configurable in EMC02 class
 		//this.moveTo(hm,targetPoint, 1.0); //this is just for debugging, it's mutually exclusive with the prb command below...
 		String prbStr = new String(String.format("{'prb':{'x':%d,'y':%d,'z':%d,'pn':%d}}",raw.x, raw.y, raw.z, probePin));
-		sendJsonCommand( prbStr, 5000 );
+		List<JsonObject> responses = sendJsonCommand( prbStr, 5000 );
 		logger.debug("Do Z probe point : Returning..");
-		return 0.0;
+		JsonObject o = responses.get(0).getAsJsonObject().get("r").getAsJsonObject().get("prb").getAsJsonObject();
+		Location location = parseLocationFromSteps(o, new String[] { "x", "y", "z" });
+		setLocation(getFireStepLocation());
+        return location;
 	}
 	
 	private void setMotorDirection(boolean xyz, boolean rot, boolean enable) throws Exception {
@@ -579,7 +684,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		return objects;
 	}
 	
-	private List<JsonObject> sendJsonCommand(String command, long timeout) throws Exception {
+	public List<JsonObject> sendJsonCommand(String command, long timeout) throws Exception {
 		List<String> responses = sendCommand(command.replaceAll("'", "\""), timeout);
 		return processStatusResponses(responses);
 	}
