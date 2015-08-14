@@ -24,11 +24,15 @@ package org.firepick.driver.wizards;
 import java.awt.FlowLayout;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.JButton;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -48,10 +52,11 @@ import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
-import javax.swing.JLabel;
 
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
+    private List<String> history = new ArrayList<String>();
+    private int historyIndex = 0;
     
     public FireStepDriverWizard(FireStepDriver driver) {
         super(driver);
@@ -75,6 +80,26 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         panelTerminal.add(terminalCommandTextField, "2, 2, fill, default");
         terminalCommandTextField.setColumns(10);
         terminalCommandTextField.setAction(send);
+        terminalCommandTextField.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_UP) {
+                    if (++historyIndex >= history.size()) {
+                        historyIndex = 0;
+                    }
+                    terminalCommandTextField.setText(history.get(historyIndex));
+                }
+                else if (e.getKeyCode() == KeyEvent.VK_DOWN) {
+                    if (--historyIndex < 0) {
+                        historyIndex = history.size() - 1;
+                    }
+                    terminalCommandTextField.setText(history.get(historyIndex));
+                }
+                else {
+                    super.keyTyped(e);
+                }
+            }
+        });
         
         JButton btnSend = new JButton(send);
         panelTerminal.add(btnSend, "4, 2");
@@ -193,7 +218,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         public void actionPerformed(ActionEvent arg0) {
             final Nozzle nozzle = Configuration.get().getMachine().getHeads().get(0).getNozzles().get(0); //Assumes one head on the machine
             try {
-                double[][] results = driver.doDetailedZProbe((ReferenceHeadMountable) nozzle);
+                double[][] results = driver.doZProbeDetailed((ReferenceHeadMountable) nozzle);
                 resolveMissingDetailedZprobeData(results);
                 String s = "";
                 for (int y = 0, yCount = results.length; y < yCount; y++) {
@@ -284,13 +309,15 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         @Override
         public void actionPerformed(ActionEvent arg0) {
             try {
-                List<JsonObject> responses = driver.sendJsonCommand(terminalCommandTextField.getText(), 10000);
+                List<JsonObject> responses = driver.sendJsonCommand(terminalCommandTextField.getText(), 30000);
                 String s = "";
                 for (JsonObject o : responses) {
                     s += o.toString() + "\r\n";
                 }
                 terminalLogTextPane.setText(terminalLogTextPane.getText() + s);
-                terminalLogTextPane.scrollRectToVisible(new Rectangle(0, terminalLogTextPane.getBounds(null).height, 1, 1));            
+                terminalLogTextPane.scrollRectToVisible(new Rectangle(0, terminalLogTextPane.getBounds(null).height, 1, 1));
+                history.add(0, terminalCommandTextField.getText());
+                historyIndex = 0;
             }
             catch (Exception e1){
                 JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);

@@ -34,9 +34,9 @@ public class RotatableDeltaKinematicsCalculator {
 	private double TOOL_OFFSET = 30.500;
 	private double Z_CALC_OFFSET = ((DELTA_Z_OFFSET - TOOL_OFFSET - DELTA_EE_OFFS) * -1);
 	
-	private double HOME_ANGLE_X  = -67.200; // Angle of the "X" endstop sensor (0=horizontal)
-	private double HOME_ANGLE_Y  = -67.200; // Angle of the "Y" endstop sensor (0=horizontal)
-	private double HOME_ANGLE_Z  = -67.200; // Angle of the "Z" endstop sensor (0=horizontal)
+	private double HOME_ANGLE_X  = -64.165; // Angle of the "X" endstop sensor (0=horizontal)
+	private double HOME_ANGLE_Y  = -64.165; // Angle of the "Y" endstop sensor (0=horizontal)
+	private double HOME_ANGLE_Z  = -64.165; // Angle of the "Z" endstop sensor (0=horizontal)
 
 	private double deltaE  = 131.636; // End effector length
 	private double deltaF  = 190.526; // Base length
@@ -45,8 +45,12 @@ public class RotatableDeltaKinematicsCalculator {
 	
 	private double XYZ_FULL_STEPS_PER_ROTATION = 200.0;
 	private double XYZ_MICROSTEPS = 16.0;
-	private double PULLEY_REDUCTION = 9.429686699; //NOTE: This was calculated off of the actual pitch diameter of both pulleys. 
-	private double XYZ_STEPS = (XYZ_FULL_STEPS_PER_ROTATION*XYZ_MICROSTEPS*PULLEY_REDUCTION)/360.0;
+    private double PULLEY_REDUCTION_X = 9.55882352925; // validated for X 
+    private double PULLEY_REDUCTION_Y = 9.55882352925; // validated for Y 
+    private double PULLEY_REDUCTION_Z = 9.60979505961; // validated for Z
+    private double X_STEPS = (XYZ_FULL_STEPS_PER_ROTATION*XYZ_MICROSTEPS*PULLEY_REDUCTION_X)/360.0;
+    private double Y_STEPS = (XYZ_FULL_STEPS_PER_ROTATION*XYZ_MICROSTEPS*PULLEY_REDUCTION_Y)/360.0;
+    private double Z_STEPS = (XYZ_FULL_STEPS_PER_ROTATION*XYZ_MICROSTEPS*PULLEY_REDUCTION_Z)/360.0;
 	
 	public class RotatableDeltaKinematicsException extends Exception {
 		public RotatableDeltaKinematicsException(String message){
@@ -70,9 +74,9 @@ public class RotatableDeltaKinematicsCalculator {
 	    return deltaF;
 	}
 	
-	public double getGr() {
-	    return PULLEY_REDUCTION;
-	}
+//	public double getGr() {
+//	    return PULLEY_REDUCTION;
+//	}
 	
     public double getHa1() {
         return HOME_ANGLE_X;
@@ -99,17 +103,20 @@ public class RotatableDeltaKinematicsCalculator {
     }
     
 	//Return raw steps, given an angle
-	public int getRawStepsFromAngle(double angle)
+	public int getRawStepsFromAngle(double xyzSteps, double angle)
 	{
-		return (int)(angle * XYZ_STEPS + 0.5d);
+		return (int)(angle * xyzSteps + 0.5d);
 	}
 	
-	public double getAngleFromRawSteps(int steps) {
-	    return (steps - 0.5d) / XYZ_STEPS;
+	public double getAngleFromRawSteps(double xyzSteps, int steps) {
+	    return (steps - 0.5d) / xyzSteps;
 	}
 	
 	public AngleTriplet getAnglesFromRawSteps(RawStepTriplet steps) {
-	    return new AngleTriplet(getAngleFromRawSteps(steps.x), getAngleFromRawSteps(steps.y), getAngleFromRawSteps(steps.z));
+	    return new AngleTriplet(
+	            getAngleFromRawSteps(X_STEPS, steps.x), 
+	            getAngleFromRawSteps(Y_STEPS, steps.y), 
+	            getAngleFromRawSteps(Z_STEPS, steps.z));
 	}
 	
 	public Location getLocation(RawStepTriplet steps) throws Exception {
@@ -123,7 +130,10 @@ public class RotatableDeltaKinematicsCalculator {
 	//Get the raw step home positions for the three axes
 	public RawStepTriplet getHomePosRaw()
 	{
-		return new RawStepTriplet(getRawStepsFromAngle(HOME_ANGLE_X),getRawStepsFromAngle(HOME_ANGLE_Y),getRawStepsFromAngle(HOME_ANGLE_Z));
+		return new RawStepTriplet(
+		        getRawStepsFromAngle(X_STEPS, HOME_ANGLE_X),
+		        getRawStepsFromAngle(Y_STEPS, HOME_ANGLE_Y),
+		        getRawStepsFromAngle(Z_STEPS, HOME_ANGLE_Z));
 	}
 	
 	//Get the homing angles for the three axes
@@ -139,7 +149,10 @@ public class RotatableDeltaKinematicsCalculator {
 	//Get the raw steps for a specified angle
 	public RawStepTriplet getRawSteps(AngleTriplet deltaCalc)
 	{
-		return new RawStepTriplet(getRawStepsFromAngle(deltaCalc.x),getRawStepsFromAngle(deltaCalc.y),getRawStepsFromAngle(deltaCalc.z));
+		return new RawStepTriplet(
+		        getRawStepsFromAngle(X_STEPS, deltaCalc.x),
+		        getRawStepsFromAngle(Y_STEPS, deltaCalc.y),
+		        getRawStepsFromAngle(Z_STEPS, deltaCalc.z));
 	}
 	
 	

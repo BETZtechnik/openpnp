@@ -27,6 +27,8 @@ along with OpenPnP.  If not, see <http://www.gnu.org/licenses/>.
 
 package org.firepick.driver;
 
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +39,8 @@ import java.util.concurrent.TimeoutException;
 import javax.swing.Action;
 
 import org.firepick.driver.wizards.FireStepDriverWizard;
+import org.firepick.gfilter.GCoordinate;
+import org.firepick.gfilter.MappedPointFilter;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
 import org.firepick.model.AngleTriplet;
 import org.firepick.model.RawStepTriplet;
@@ -91,9 +95,21 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private Queue<String> responseQueue = new ConcurrentLinkedQueue<String>();
 	private JsonParser parser = new JsonParser();
 	
+	@Attribute(required=false)
+	private boolean useGfilter = false;
+	
+	private MappedPointFilter gFilter;
+	
 	@Override
 	public void setEnabled(boolean enabled) throws Exception {
 	    if (enabled) {
+	        if (useGfilter) {
+	            File file = new File(Configuration.get().getConfigurationDirectory(), "gfilter.json");
+	            gFilter = new ConcreteMappedPointFilter(new FileReader(file));
+	        }
+	        else {
+	            gFilter = null;
+	        }
 	        if (!connected) {
 	            try {
 	                connect();
@@ -180,6 +196,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         double xScale = location.getX() < 0 ? xMinusScale : xPlusScale;
         double yScale = location.getY() < 0 ? yMinusScale : yPlusScale;
         Location scaledLocation = location.multiply(xScale, yScale, 1.0, 1.0);
+        if (useGfilter) {
+            GCoordinate coord = new GCoordinate(scaledLocation.getX(), scaledLocation.getY(), scaledLocation.getZ());
+            GCoordinate mappedCoord = gFilter.interpolate(coord);
+            logger.debug("gFilter mapped: {} -> {} -> {}", new Object[] { scaledLocation, coord, mappedCoord });
+            scaledLocation = scaledLocation.derive(mappedCoord.getX(), mappedCoord.getY(), mappedCoord.getZ(), null);
+        }
 	    
         if (useFireStepKinematics) {
             moveToFireStepKinematics(hm, scaledLocation, speed);
@@ -369,79 +391,23 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		disconnectRequested = false;
 	}
 	
-	public double[][] doDetailedZProbe(ReferenceHeadMountable hm) throws Exception {
-        logger.debug("Performing Z probe...");
-        
-        double DELTA_PROBABLE_RADIUS = 90.0; //214mm / 2 -10
-        double LEFT_PROBE_BED_POSITION  = -DELTA_PROBABLE_RADIUS;
-        double RIGHT_PROBE_BED_POSITION =  DELTA_PROBABLE_RADIUS;
-        double BACK_PROBE_BED_POSITION  =  DELTA_PROBABLE_RADIUS;
-        double FRONT_PROBE_BED_POSITION = -DELTA_PROBABLE_RADIUS;
-
-        int ACCURATE_BED_LEVELING_POINTS = 9;       
-        double ACCURATE_BED_LEVELING_GRID_Y = ((BACK_PROBE_BED_POSITION - FRONT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
-        double ACCURATE_BED_LEVELING_GRID_X = ((RIGHT_PROBE_BED_POSITION - LEFT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
-
-        double bed_level[][] = new double[ACCURATE_BED_LEVELING_POINTS][ACCURATE_BED_LEVELING_POINTS];
-        
-        // First, do a probe at 0,0 to determine the approximate bed height and then work
-        // slightly above it.
-        Location startLocation = doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0));
-        startLocation = startLocation.add(new Location(LengthUnit.Millimeters, 0, 0, 20, 0));
-
-        for (int yCount = 0; yCount < ACCURATE_BED_LEVELING_POINTS; yCount++) {
-            double yProbe = FRONT_PROBE_BED_POSITION
-                    + ACCURATE_BED_LEVELING_GRID_Y * yCount;
-            int xStart, xStop, xInc;
-            if ((yCount % 2) != 0) {
-                xStart = 0;
-                xStop = ACCURATE_BED_LEVELING_POINTS;
-                xInc = 1;
-            } else {
-                xStart = ACCURATE_BED_LEVELING_POINTS - 1;
-                xStop = -1;
-                xInc = -1;
-            }
-
-            for (int xCount = xStart; xCount != xStop; xCount += xInc) {
-                double xProbe = LEFT_PROBE_BED_POSITION + ACCURATE_BED_LEVELING_GRID_X * xCount;
-
-                // Avoid probing the corners (outside the round or hexagon print surface) on a delta printer.
-                double distance_from_center = Math.sqrt(xProbe * xProbe + yProbe * yProbe);
-                if (distance_from_center <= DELTA_PROBABLE_RADIUS) {
-                    // Now do the Z probe
-                    Location probedLocation = new Location(LengthUnit.Millimeters, xProbe, yProbe, startLocation.getZ(), 0);
-                    double measured_z = 0;
-                    for (int i = 0; i < 5; i++) {
-                        measured_z = doZprobePoint(hm, probedLocation).getZ();
-                    }
-                    bed_level[xCount][yCount] = measured_z;
-                }
-                else {
-                    bed_level[xCount][yCount] = Double.NaN;
-                }
-            }
-        }
-        hm.moveTo(startLocation, 1.0);
-        return bed_level;
-	}
-	
 	private void setFireStepKinematicsEnabled(boolean enabled) throws Exception {
 	    if (enabled) {
-	        sendJsonCommand("{'systo':1}", 3000);
-	        sendJsonCommand(String.format("{ 'dim' : { 'e' : %f, 'f' : %f, 'gr' : %f, 'ha1' : %f, 'ha2' : %f, 'ha3' : %f, 'mi' : %d, 're' : %f, 'rf' : %f, 'st' : %d, 'zo' : %f}}", 
-	                deltaCalc.getE(),
-	                deltaCalc.getF(),
-	                deltaCalc.getGr(),
-	                deltaCalc.getHa1(),
-	                deltaCalc.getHa2(),
-	                deltaCalc.getHa3(),
-	                (int) deltaCalc.getMi(),
-	                deltaCalc.getRe(),
-	                deltaCalc.getRf(),
-	                (int) deltaCalc.getSt(),
-	                -deltaCalc.getZo()
-	                ), 3000);
+	        throw new Exception("Currently disabled, needs to be updated to handle independent gear ratios.");
+//	        sendJsonCommand("{'systo':1}", 3000);
+//	        sendJsonCommand(String.format("{ 'dim' : { 'e' : %f, 'f' : %f, 'gr' : %f, 'ha1' : %f, 'ha2' : %f, 'ha3' : %f, 'mi' : %d, 're' : %f, 'rf' : %f, 'st' : %d, 'zo' : %f}}", 
+//	                deltaCalc.getE(),
+//	                deltaCalc.getF(),
+//	                deltaCalc.getGr(),
+//	                deltaCalc.getHa1(),
+//	                deltaCalc.getHa2(),
+//	                deltaCalc.getHa3(),
+//	                (int) deltaCalc.getMi(),
+//	                deltaCalc.getRe(),
+//	                deltaCalc.getRf(),
+//	                (int) deltaCalc.getSt(),
+//	                -deltaCalc.getZo()
+//	                ), 3000);
 	    }
 	    else {
 	        sendJsonCommand("{'systo':0}", 3000);
@@ -582,6 +548,61 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         return location;
 	}
 	
+    public double[][] doZProbeDetailed(ReferenceHeadMountable hm) throws Exception {
+        logger.debug("Performing Z probe...");
+        
+        double DELTA_PROBABLE_RADIUS = 90.0; //214mm / 2 -10
+        double LEFT_PROBE_BED_POSITION  = -DELTA_PROBABLE_RADIUS;
+        double RIGHT_PROBE_BED_POSITION =  DELTA_PROBABLE_RADIUS;
+        double BACK_PROBE_BED_POSITION  =  DELTA_PROBABLE_RADIUS;
+        double FRONT_PROBE_BED_POSITION = -DELTA_PROBABLE_RADIUS;
+
+        int ACCURATE_BED_LEVELING_POINTS = 9;       
+        double ACCURATE_BED_LEVELING_GRID_Y = ((BACK_PROBE_BED_POSITION - FRONT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
+        double ACCURATE_BED_LEVELING_GRID_X = ((RIGHT_PROBE_BED_POSITION - LEFT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
+
+        double bed_level[][] = new double[ACCURATE_BED_LEVELING_POINTS][ACCURATE_BED_LEVELING_POINTS];
+        
+        // First, do a probe at 0,0 to determine the approximate bed height and then work
+        // slightly above it.
+        Location startLocation = doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0));
+        startLocation = startLocation.add(new Location(LengthUnit.Millimeters, 0, 0, 20, 0));
+
+        for (int yCount = 0; yCount < ACCURATE_BED_LEVELING_POINTS; yCount++) {
+            double yProbe = FRONT_PROBE_BED_POSITION
+                    + ACCURATE_BED_LEVELING_GRID_Y * yCount;
+            int xStart, xStop, xInc;
+            if ((yCount % 2) != 0) {
+                xStart = 0;
+                xStop = ACCURATE_BED_LEVELING_POINTS;
+                xInc = 1;
+            } else {
+                xStart = ACCURATE_BED_LEVELING_POINTS - 1;
+                xStop = -1;
+                xInc = -1;
+            }
+
+            for (int xCount = xStart; xCount != xStop; xCount += xInc) {
+                double xProbe = LEFT_PROBE_BED_POSITION + ACCURATE_BED_LEVELING_GRID_X * xCount;
+
+                // Avoid probing the corners (outside the round or hexagon print surface) on a delta printer.
+                double distance_from_center = Math.sqrt(xProbe * xProbe + yProbe * yProbe);
+                if (distance_from_center <= DELTA_PROBABLE_RADIUS) {
+                    // Now do the Z probe
+                    Location probedLocation = new Location(LengthUnit.Millimeters, xProbe, yProbe, startLocation.getZ(), 0);
+                    double measured_z = 0;
+                    measured_z = doZprobePoint(hm, probedLocation).getZ();
+                    bed_level[xCount][yCount] = measured_z;
+                }
+                else {
+                    bed_level[xCount][yCount] = Double.NaN;
+                }
+            }
+        }
+        hm.moveTo(startLocation, 1.0);
+        return bed_level;
+    }
+    
 	private void setMotorDirection(boolean xyz, boolean rot, boolean enable) throws Exception {
 	    logger.debug(String.format("%s%s Stepper motor Direction set to %s", xyz?"XYZ":"", rot?"A":"", enable?"enabled":"disabled" ));
 	    sendFireStepConfig(xyz, rot, "dh", enable?"true":"false");
