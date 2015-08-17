@@ -200,7 +200,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             GCoordinate coord = new GCoordinate(scaledLocation.getX(), scaledLocation.getY(), scaledLocation.getZ());
             GCoordinate mappedCoord = gFilter.interpolate(coord);
             logger.debug("gFilter mapped: {} -> {} -> {}", new Object[] { scaledLocation, coord, mappedCoord });
-            scaledLocation = scaledLocation.derive(mappedCoord.getX(), mappedCoord.getY(), mappedCoord.getZ(), null);
+//            scaledLocation = scaledLocation.derive(mappedCoord.getX(), mappedCoord.getY(), mappedCoord.getZ(), null);
+            scaledLocation = scaledLocation.derive(mappedCoord.getX(), mappedCoord.getY(), null, null);
         }
 	    
         if (useFireStepKinematics) {
