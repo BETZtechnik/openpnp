@@ -40,7 +40,7 @@ public class RotatableDeltaKinematicsCalculator {
 
 	private double deltaE  = 131.636; // End effector length
 	private double deltaF  = 190.526; // Base length
-	private double deltaRe = 270.000; // Carbon rod length
+	private double deltaRe = 268.000; // Carbon rod length
 	private double deltaRf = 90.000;  // Servo horn length
 	
 	private double XYZ_FULL_STEPS_PER_ROTATION = 200.0;
@@ -51,6 +51,10 @@ public class RotatableDeltaKinematicsCalculator {
     private double X_STEPS = (XYZ_FULL_STEPS_PER_ROTATION*XYZ_MICROSTEPS*PULLEY_REDUCTION_X)/360.0;
     private double Y_STEPS = (XYZ_FULL_STEPS_PER_ROTATION*XYZ_MICROSTEPS*PULLEY_REDUCTION_Y)/360.0;
     private double Z_STEPS = (XYZ_FULL_STEPS_PER_ROTATION*XYZ_MICROSTEPS*PULLEY_REDUCTION_Z)/360.0;
+	
+	private int HOME_STEPS_X = -5440;
+	private int HOME_STEPS_Y = -5439;
+	private int HOME_STEPS_Z = -5503;
 	
 	public class RotatableDeltaKinematicsException extends Exception {
 		public RotatableDeltaKinematicsException(String message){
@@ -78,29 +82,29 @@ public class RotatableDeltaKinematicsCalculator {
 //	    return PULLEY_REDUCTION;
 //	}
 	
-    public double getHa1() {
-        return HOME_ANGLE_X;
-    }
-    
-    public double getHa2() {
-        return HOME_ANGLE_Y;
-    }
-    
-    public double getHa3() {
-        return HOME_ANGLE_Z;
-    }
-    
-    public double getMi() {
-        return XYZ_MICROSTEPS;
-    }
+//    public double getHa1() {
+//        return HOME_ANGLE_X;
+//    }
+//    
+//    public double getHa2() {
+//        return HOME_ANGLE_Y;
+//    }
+//    
+//    public double getHa3() {
+//        return HOME_ANGLE_Z;
+//    }
+//    
+//    public double getMi() {
+//        return XYZ_MICROSTEPS;
+//    }
     
     public double getZo() {
         return Z_CALC_OFFSET;
     }
     
-    public double getSt() {
-        return XYZ_FULL_STEPS_PER_ROTATION;
-    }
+//    public double getSt() {
+//        return XYZ_FULL_STEPS_PER_ROTATION;
+//    }
     
 	//Return raw steps, given an angle
 	public int getRawStepsFromAngle(double xyzSteps, double angle)
@@ -130,10 +134,8 @@ public class RotatableDeltaKinematicsCalculator {
 	//Get the raw step home positions for the three axes
 	public RawStepTriplet getHomePosRaw()
 	{
-		return new RawStepTriplet(
-		        getRawStepsFromAngle(X_STEPS, HOME_ANGLE_X),
-		        getRawStepsFromAngle(Y_STEPS, HOME_ANGLE_Y),
-		        getRawStepsFromAngle(Z_STEPS, HOME_ANGLE_Z));
+	    // TODO: Hardcoded from backwards z probe test.
+		return new RawStepTriplet(HOME_STEPS_X, HOME_STEPS_Y, HOME_STEPS_Z);
 	}
 	
 	//Get the homing angles for the three axes
@@ -146,16 +148,92 @@ public class RotatableDeltaKinematicsCalculator {
 		return delta_calcForward(getHomePos());
 	}
 	
-	//Get the raw steps for a specified angle
-	public RawStepTriplet getRawSteps(AngleTriplet deltaCalc)
-	{
-		return new RawStepTriplet(
-		        getRawStepsFromAngle(X_STEPS, deltaCalc.x),
-		        getRawStepsFromAngle(Y_STEPS, deltaCalc.y),
-		        getRawStepsFromAngle(Z_STEPS, deltaCalc.z));
+	public RawStepTriplet getRawSteps(AngleTriplet deltaCalc) {
+	    return getRawStepsMapped(deltaCalc);
 	}
 	
-	
+    //Get the raw steps for a specified angle
+    public RawStepTriplet getRawStepsPulleyDiameter(AngleTriplet deltaCalc)
+    {
+        return new RawStepTriplet(
+                getRawStepsFromAngle(X_STEPS, deltaCalc.x),
+                getRawStepsFromAngle(Y_STEPS, deltaCalc.y),
+                getRawStepsFromAngle(Z_STEPS, deltaCalc.z));
+    }
+    
+    //Get the raw steps for a specified angle
+    public RawStepTriplet getRawStepsMapped(AngleTriplet deltaCalc)
+    {
+        double[][] table =  new double[][] {
+                {-5550,-66.132,-65.628,-66.132},
+                {-5000,-59.508,-59.076,-59.544},
+                {-4500,-53.532,-53.172,-53.604},
+                {-4000,-47.592,-47.268,-47.664},
+                {-3500,-41.652,-41.364,-41.724},
+                {-3000,-35.676,-35.496,-35.748},
+                {-2500,-29.7,-29.556,-29.808},
+                {-2000,-23.76,-23.652,-23.868},
+                {-1500,-17.784,-17.748,-17.928},
+                {-1000,-11.844,-11.844,-11.952},
+                {-500,-5.904,-5.904,-5.976},
+                {0,0,0.036,0},
+                {500,5.976,5.976,5.976},
+                {1000,11.916,11.916,11.952},
+                {1500,17.856,17.856,17.928},
+                {2000,23.796,23.796,23.904},
+                {2500,29.7,29.772,29.88},
+                {3000,35.64,35.712,35.892},
+                {3500,41.544,41.652,41.868},
+                {4000,47.484,47.628,47.844},
+                {4500,53.388,53.604,53.82},
+                {5000,59.328,59.544,59.796},
+                {5500,65.232,65.52,65.772}
+        };
+        
+        // find the index of the first angle that is greater than
+        // the input
+        // find the bounding angles in the table for the axis
+        // determine the difference between the angles and the
+        // steps for the bounds
+        // create a ratio between the two
+        // scale the bound start by the ratio to get the output
+        RawStepTriplet baseline = getRawStepsPulleyDiameter(deltaCalc);
+        int stepsX = baseline.x, stepsY = baseline.y, stepsZ = baseline.z;
+        // Note we skip the first point because if we find the value at
+        // the first point we don't have a lower bound to calculate from.
+        boolean foundX = false, foundY = false, foundZ = false;
+        for (int i = 1; i < table.length; i++) {
+            if (!foundX && table[i - 1][1] <= deltaCalc.x && table[i][1] >= deltaCalc.x) {
+                double stepsPerDegree = (table[i][0] - table[i - 1][0]) / (table[i][1] - table[i - 1][1]);
+                int lowerBoundSteps = (int) table[i - 1][0];
+                double angleDifference = deltaCalc.x - table[i - 1][1];
+                stepsX = (int) (lowerBoundSteps + (angleDifference * stepsPerDegree));
+                foundX = true;
+            }
+            if (!foundY && table[i - 1][2] <= deltaCalc.y && table[i][2] >= deltaCalc.y) {
+                double stepsPerDegree = (table[i][0] - table[i - 1][0]) / (table[i][2] - table[i - 1][2]);
+                int lowerBoundSteps = (int) table[i - 1][0];
+                double angleDifference = deltaCalc.y - table[i - 1][2];
+                stepsY = (int) (lowerBoundSteps + (angleDifference * stepsPerDegree));
+                foundY = true;
+            }
+            if (!foundZ && table[i - 1][3] <= deltaCalc.z && table[i][3] >= deltaCalc.z) {
+                double stepsPerDegree = (table[i][0] - table[i - 1][0]) / (table[i][3] - table[i - 1][3]);
+                int lowerBoundSteps = (int) table[i - 1][0];
+                double angleDifference = deltaCalc.z - table[i - 1][3];
+                stepsZ = (int) (lowerBoundSteps + (angleDifference * stepsPerDegree));
+                foundZ = true;
+            }
+        }
+        
+        RawStepTriplet mapped = new RawStepTriplet(stepsX, stepsY, stepsZ);
+        System.out.println(deltaCalc);
+        System.out.println(baseline);
+        System.out.println(mapped);
+        System.out.println();
+        return mapped;
+    }
+    
 	//Delta calc stuff
     private static final double sin120 = Math.sqrt(3.0) / 2.0;
     private static final double cos120 = -0.5;
