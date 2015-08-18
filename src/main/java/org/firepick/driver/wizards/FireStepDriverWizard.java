@@ -52,6 +52,7 @@ import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
+import java.awt.BorderLayout;
 
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
@@ -61,6 +62,54 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     public FireStepDriverWizard(FireStepDriver driver) {
         super(driver);
         this.driver = driver;
+        
+        JPanel panelAngles = new JPanel();
+        panelAngles.setBorder(new TitledBorder(null, "Angles", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+        contentPanel.add(panelAngles);
+        panelAngles.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,}));
+        
+        JLabel lblX = new JLabel("X");
+        panelAngles.add(lblX, "2, 2");
+        
+        JLabel lblY = new JLabel("Y");
+        panelAngles.add(lblY, "4, 2");
+        
+        JLabel lblZ = new JLabel("Z");
+        panelAngles.add(lblZ, "6, 2");
+        
+        angleX = new JTextField();
+        angleX.setText("0");
+        panelAngles.add(angleX, "2, 4");
+        angleX.setColumns(6);
+        angleX.setAction(goToAngles);
+        
+        angleY = new JTextField();
+        angleY.setText("0");
+        panelAngles.add(angleY, "4, 4, fill, default");
+        angleY.setColumns(6);
+        angleY.setAction(goToAngles);
+        
+        angleZ = new JTextField();
+        angleZ.setText("0");
+        panelAngles.add(angleZ, "6, 4, fill, default");
+        angleZ.setColumns(6);
+        angleZ.setAction(goToAngles);
+        
+        JButton btnGo = new JButton(goToAngles);
+        panelAngles.add(btnGo, "8, 4");
         
         JPanel panelTerminal = new JPanel();
         panelTerminal.setBorder(new TitledBorder(null, "Terminal", TitledBorder.LEADING, TitledBorder.TOP, null, null));
@@ -324,6 +373,20 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
             }
         }
     };
+    
+    @SuppressWarnings("serial")
+    private Action goToAngles = new AbstractAction("Go") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            try {
+                driver.moveToAngles(Double.parseDouble(angleX.getText()), Double.parseDouble(angleY.getText()), Double.parseDouble(angleZ.getText()));
+            }
+            catch (Exception e1){
+                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    };
+    
     private JTextField terminalCommandTextField;
     private JTextPane terminalLogTextPane;
     private JTextPane zProbeResultsTextPane;
@@ -331,4 +394,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     private JLabel labelFrontLeft;
     private JLabel labelBackLeft;
     private JLabel labelBackRight;
+    private JTextField angleX;
+    private JTextField angleY;
+    private JTextField angleZ;
 }

@@ -303,6 +303,17 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 location.getZ()
                 ), 10000);
     }
+    
+    public void moveToAngles(double x, double y, double z) throws Exception {
+        AngleTriplet angles = new AngleTriplet(x, y, z);
+        RawStepTriplet steps = deltaCalc.getRawSteps(angles);
+        sendJsonCommand(String.format("{'mov':{'x':%d,'y':%d,'z':%d}}", 
+                steps.x, 
+                steps.y, 
+                steps.z
+                ), 10000);
+        setLocation(getFireStepLocation());
+    }
 	
 	@Override
 	public void pick(ReferenceNozzle nozzle) throws Exception {
@@ -793,5 +804,4 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	            new PropertySheetWizardAdapter(getConfigurationWizard())
 	    };
 	}
-
 }
