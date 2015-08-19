@@ -38,7 +38,6 @@ import javax.swing.Action;
 
 import org.firepick.driver.wizards.FireStepDriverWizard;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
-import org.firepick.model.AngleTriplet;
 import org.firepick.model.RawStepTriplet;
 import org.openpnp.gui.support.PropertySheetWizardAdapter;
 import org.openpnp.gui.support.Wizard;
@@ -52,7 +51,6 @@ import org.openpnp.model.Configuration;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
 import org.openpnp.spi.PropertySheetHolder;
-import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,10 +62,6 @@ import com.google.gson.JsonParser;
 public class FireStepDriver extends AbstractSerialPortDriver implements Runnable {
 	private static final Logger logger = LoggerFactory.getLogger(FireStepDriver.class);
 	private static final double minimumRequiredVersion = 1.0;
-	
-	// NOTE: This is ignored out because FireStep doesn't use feed rates per se.. it just does everything rather quickly and smoothly.
-	@Attribute
-	private double feedRateMmPerMinute;
 	
 	//@Attribute
 	private double nozzleStepsPerDegree =  8.888888888;
@@ -207,6 +201,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
     public void moveToRaw(ReferenceHeadMountable hm, Location location, double speed)
             throws Exception {
+        logger.debug("moveToRaw {}", location);
         int rotSteps = 0;
         RawStepTriplet rs = new RawStepTriplet(0,0,0);
         boolean moveXyz = false;
@@ -558,8 +553,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	}
 
 	private void setHomingSpeed(int delay) throws Exception {
-	    // TODO: FireStep doesn't seem to understand this.
-//		sendJsonCommand(String.format("{'xsd':%d,'ysd':%d,'zsd':%d}",delay,delay,delay), 100);       // Search delay (think this is the homing speed)
+		sendJsonCommand(String.format("{'xsd':%d,'ysd':%d,'zsd':%d}",delay,delay,delay), 100);       // Search delay (think this is the homing speed)
 	}
 	
 
