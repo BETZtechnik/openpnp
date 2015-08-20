@@ -27,6 +27,8 @@ along with OpenPnP.  If not, see <http://www.gnu.org/licenses/>.
 
 package org.firepick.driver;
 
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,8 +39,12 @@ import java.util.concurrent.TimeoutException;
 import javax.swing.Action;
 
 import org.firepick.driver.wizards.FireStepDriverWizard;
+import org.firepick.gfilter.GCoordinate;
+import org.firepick.gfilter.MappedPointFilter;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
 import org.firepick.model.RawStepTriplet;
+import org.openpnp.gui.MachineControlsPanel;
+import org.openpnp.gui.MainFrame;
 import org.openpnp.gui.support.PropertySheetWizardAdapter;
 import org.openpnp.gui.support.Wizard;
 import org.openpnp.machine.reference.ReferenceActuator;
@@ -50,7 +56,9 @@ import org.openpnp.machine.reference.driver.AbstractSerialPortDriver;
 import org.openpnp.model.Configuration;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
+import org.openpnp.spi.Camera;
 import org.openpnp.spi.PropertySheetHolder;
+import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,22 +89,21 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private Queue<String> responseQueue = new ConcurrentLinkedQueue<String>();
 	private JsonParser parser = new JsonParser();
 	
-	// TODO: move to an element
-//	@Attribute(required=false)
-//	private boolean useGfilter = false;
-//	
-//	private MappedPointFilter gFilter;
+	@Attribute(required=false)
+	private boolean useGfilter = false;
+	
+	private MappedPointFilter gFilter;
 	
 	@Override
 	public void setEnabled(boolean enabled) throws Exception {
 	    if (enabled) {
-//	        if (useGfilter) {
-//	            File file = new File(Configuration.get().getConfigurationDirectory(), "gfilter.json");
-//	            gFilter = new ConcreteMappedPointFilter(new FileReader(file));
-//	        }
-//	        else {
-//	            gFilter = null;
-//	        }
+	        if (useGfilter) {
+	            File file = new File(Configuration.get().getConfigurationDirectory(), "gfilter.json");
+	            gFilter = new ConcreteMappedPointFilter(new FileReader(file));
+	        }
+	        else {
+	            gFilter = null;
+	        }
 	        if (!connected) {
 	            try {
 	                connect();
@@ -174,12 +181,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 Double.isNaN(location.getZ()) ? this.z : location.getZ(),
                 Double.isNaN(location.getRotation()) ? this.c : location.getRotation());
         Location scaledLocation = location.derive(null, null, null, null);
-//        if (useGfilter) {
-//            GCoordinate coord = new GCoordinate(scaledLocation.getX(), scaledLocation.getY(), scaledLocation.getZ());
-//            GCoordinate mappedCoord = gFilter.interpolate(coord);
-//            logger.debug("gFilter mapped: {} -> {} -> {}", new Object[] { scaledLocation, coord, mappedCoord });
-//            scaledLocation = scaledLocation.derive(mappedCoord.getX(), mappedCoord.getY(), null, null);
-//        }
+        if (useGfilter) {
+            GCoordinate coord = new GCoordinate(scaledLocation.getX(), scaledLocation.getY(), scaledLocation.getZ());
+            GCoordinate mappedCoord = gFilter.interpolate(coord);
+            logger.debug("gFilter mapped: {} -> {} -> {}", new Object[] { scaledLocation, coord, mappedCoord });
+            scaledLocation = scaledLocation.derive(mappedCoord.getX(), mappedCoord.getY(), null, null);
+        }
 	    
         moveToRaw(hm, scaledLocation, speed);
 
@@ -226,11 +233,11 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         Location currentLoc = new Location(LengthUnit.Millimeters, this.x, this.y, this.z, 0);
         if (Math.abs(location.getXyzDistanceTo(currentLoc)) >= 0.01) {
             moveXyz = true;
-            logger.debug(String.format("moveTo Cartesian: X: %.3f, Y: %.3f, Z: %.3f",location.getX(), location.getY(),location.getZ() ));
+            logger.trace(String.format("moveTo Cartesian: X: %.3f, Y: %.3f, Z: %.3f",location.getX(), location.getY(),location.getZ() ));
             
             // Convert angles into raw steps
             rs = deltaCalculator.getRawSteps(location);
-            logger.debug(String.format("moveTo RawSteps: X: %d, Y: %d, Z: %d",rs.x, rs.y,rs.z ));
+            logger.trace(String.format("moveTo RawSteps: X: %d, Y: %d, Z: %d",rs.x, rs.y,rs.z ));
         }
         
         
@@ -243,23 +250,23 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         rawFeedrate = (int)((double)rawFeedrate * speed); //Multiply rawFeedrate by speed, which should be 0 to 1
         if (moveXyz){
             if (moveRot){ // Cartesian move with rotation.  Feedrate is (TBD)
-                logger.debug(String.format("moveTo: Cartesian move with rotation, feedrate=%d steps/second",rawFeedrate));
+                logger.trace(String.format("moveTo: Cartesian move with rotation, feedrate=%d steps/second",rawFeedrate));
                 setRotMotorEnable(true);
                 sendJsonCommand(String.format("{'mov':{'x':%d,'y':%d,'z':%d, 'a':%d,'mv':%d}}",rs.x, rs.y, rs.z, rotSteps, rawFeedrate), 10000);
             }
             else{         // Cartesian move with no rotation.  Feedrate is just the cartesian feedrate
-                logger.debug(String.format("moveTo: Cartesian move, feedrate=%d steps/second",rawFeedrate));
+                logger.trace(String.format("moveTo: Cartesian move, feedrate=%d steps/second",rawFeedrate));
                 sendJsonCommand(String.format("{'mov':{'x':%d,'y':%d,'z':%d,'mv':%d}}",rs.x, rs.y, rs.z, rawFeedrate), 10000);
             }
         }
         else {
             if (moveRot){ // Rotation, no Cartesian move.  Feedrate is just the rotation feedrate
                 setRotMotorEnable(true);
-                logger.debug(String.format("moveTo: Rotation move, feedrate=%d steps/second",rawFeedrate));
+                logger.trace(String.format("moveTo: Rotation move, feedrate=%d steps/second",rawFeedrate));
                 sendJsonCommand(String.format("{'mov':{'a':%d,'mv':%d}}",rotSteps, rawFeedrate), 10000);
             }
             else{         // No move, nothing to do
-                logger.debug("moveTo: No move, nothing to do");
+                logger.trace("moveTo: No move, nothing to do");
             }
         }
     }
@@ -517,18 +524,47 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         return bed_level;
     }
     
+    public void generateGfilter() throws Exception {
+        /*
+         * Assume the current position is the start position, which is 0,0.
+         * We will use the start position's Z for the entire operation.
+         * We will cover a grid of X by Y at a certain increment.
+         */
+        MainFrame.machineControlsPanel.submitMachineTask(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Camera camera = Configuration.get().getMachine().getHeads().get(0).getCameras().get(0);
+                    Location startLocation = camera.getLocation();
+                    int gridX = 9, gridY = 9;
+                    double deltaX = 10, deltaY = 10;
+                    for (int y = -gridY / 2; y <= gridY / 2; y++) {
+                        for (int x = -gridX / 2; x <= gridX / 2; x++) {
+                            Location location = startLocation.add(new Location(LengthUnit.Millimeters, x * deltaX, y * deltaY, 0, 0));
+                            camera.moveTo(location, 1.0);
+                            Thread.sleep(500);
+                        }
+                    }
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+    
 	private void setMotorDirection(boolean xyz, boolean rot, boolean enable) throws Exception {
-	    logger.debug(String.format("%s%s Stepper motor Direction set to %s", xyz?"XYZ":"", rot?"A":"", enable?"enabled":"disabled" ));
+	    logger.trace(String.format("%s%s Stepper motor Direction set to %s", xyz?"XYZ":"", rot?"A":"", enable?"enabled":"disabled" ));
 	    sendFireStepConfig(xyz, rot, "dh", enable?"true":"false");
 	}
 
 	private void setXyzMotorEnable(boolean enable) throws Exception {
-	    logger.debug(String.format("XYZ Stepper motor Enable set to %s", enable?"enabled":"disabled" ));
+	    logger.trace(String.format("XYZ Stepper motor Enable set to %s", enable?"enabled":"disabled" ));
 	    sendFireStepConfig(true, false, "en", enable?"true":"false");
 	}
 	
 	private void setRotMotorEnable(boolean enable) throws Exception {
-	    logger.debug(String.format("Rotation Stepper motor Enable set to %s", enable?"enabled":"disabled" ));
+	    logger.trace(String.format("Rotation Stepper motor Enable set to %s", enable?"enabled":"disabled" ));
 	    if (enable) {
 	    	if (nozzleEnabled) {
 	    		//Already enabled, nothing to do
@@ -553,33 +589,34 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	}
 
 	private void setHomingSpeed(int delay) throws Exception {
-		sendJsonCommand(String.format("{'xsd':%d,'ysd':%d,'zsd':%d}",delay,delay,delay), 100);       // Search delay (think this is the homing speed)
+	    // TODO: This no longer seems to work in FireStep.
+//		sendJsonCommand(String.format("{'xsd':%d,'ysd':%d,'zsd':%d}",delay,delay,delay), 100);       // Search delay (think this is the homing speed)
 	}
 	
 
 	private void enablePowerSupply(boolean enable) throws Exception {
-	    logger.debug(String.format("FireStep: Power supply: %s", enable?"Turned ON":"Turned OFF" ));
+	    logger.trace(String.format("FireStep: Power supply: %s", enable?"Turned ON":"Turned OFF" ));
 		toggleDigitalPin(28,enable);
 		powerSupplyOn = enable;
 	}
 	
 	private void enableEndEffectorRingLight(boolean enable) throws Exception {
-	    logger.debug(String.format("FireStep: End effector LED ring light: %s", enable?"Turned ON":"Turned OFF" ));
+	    logger.trace(String.format("FireStep: End effector LED ring light: %s", enable?"Turned ON":"Turned OFF" ));
 		toggleDigitalPin(4,enable);
 	}
 	
 	private void enableUpLookingRingLight(boolean enable) throws Exception {
-	    logger.debug(String.format("FireStep: Up-looking LED ring light: %s", enable?"Turned ON":"Turned OFF" ));
+	    logger.trace(String.format("FireStep: Up-looking LED ring light: %s", enable?"Turned ON":"Turned OFF" ));
 		toggleDigitalPin(5,enable);
 	}
 	
 	private void enableVacuumPump(boolean enable) throws Exception {
-	    logger.debug(String.format("FireStep: Vacuum pump: %s", enable?"Enabled":"Disabled" ));
+	    logger.trace(String.format("FireStep: Vacuum pump: %s", enable?"Enabled":"Disabled" ));
 		toggleDigitalPin(26,enable);
 	}
 
 	private void toggleDigitalPin(int pin, boolean state) throws Exception {
-	    logger.debug(String.format("FireStep: Toggling digital pin %d to %s", pin, state?"HIGH":"LOW" ));
+	    logger.trace(String.format("FireStep: Toggling digital pin %d to %s", pin, state?"HIGH":"LOW" ));
         try {
 			sendJsonCommand(String.format("{'iod%d':%s}", pin, state?"true":"false"),100);
 		} catch (Exception e) {

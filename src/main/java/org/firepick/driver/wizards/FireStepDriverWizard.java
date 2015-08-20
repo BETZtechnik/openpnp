@@ -187,6 +187,9 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JButton btnDetailedZProbe = new JButton(detailedZprobe);
         panel.add(btnDetailedZProbe);
         
+        JButton btnGfilter = new JButton(gFilter);
+        panel.add(btnGfilter);
+        
         JScrollPane scrollPane = new JScrollPane();
         panelCalibration.add(scrollPane, "2, 4, fill, fill");
         
@@ -380,6 +383,19 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         public void actionPerformed(ActionEvent arg0) {
             try {
                 driver.moveToAngles(Double.parseDouble(angleX.getText()), Double.parseDouble(angleY.getText()), Double.parseDouble(angleZ.getText()));
+            }
+            catch (Exception e1){
+                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    };
+    
+    @SuppressWarnings("serial")
+    private Action gFilter = new AbstractAction("G-Filter") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            try {
+                driver.generateGfilter();
             }
             catch (Exception e1){
                 JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
