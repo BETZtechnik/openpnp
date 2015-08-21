@@ -44,7 +44,7 @@ public class FiducialLocator {
         
     }
     
-    public Location locateBoard(BoardLocation boardLocation) throws Exception {
+    public static Location locateBoard(BoardLocation boardLocation) throws Exception {
         // TODO: finish bottom code
         
         // Find the fids in the board
@@ -91,7 +91,7 @@ public class FiducialLocator {
         if (Math.abs(fidDistance - visionDistance) > fidDistance * 0.01) {
             throw new Exception("Located fiducials are more than 1% away from expected.");
         }
-        
+
         // Calculate the angle and offset from the results
         Location location = Utils2D.calculateAngleAndOffset(
                 a.getLocation(), 
@@ -105,8 +105,17 @@ public class FiducialLocator {
                 boardLocation.getLocation().convertToUnits(location.getUnits()).getZ(), 
                 null);
 
-        logger.debug("Fiducial check finished, board is at {}", location);
         return location;
+    }
+    
+    public static Location getFiducialLocation(Footprint footprint, Camera camera) throws Exception {
+        // Create the template
+        BufferedImage template = createTemplate(camera.getUnitsPerPixel(), footprint);
+        
+        // Wait for camera to settle
+        Thread.sleep(500);
+        // Perform vision operation
+        return getBestTemplateMatch(camera, template);
     }
     
     /**
@@ -128,7 +137,7 @@ public class FiducialLocator {
         logger.debug("Locating {}", fid.getId());
         
         // Create the template
-        BufferedImage template = createTemplate(camera.getUnitsPerPixel(), fid);
+        BufferedImage template = createTemplate(camera.getUnitsPerPixel(), fid.getPart().getPackage().getFootprint());
         
         // Move to where we expect to find the fid
         Location location = Utils2D.calculateBoardPlacementLocation(
@@ -191,8 +200,7 @@ public class FiducialLocator {
      * @param fid
      * @return
      */
-    private static BufferedImage createTemplate(Location unitsPerPixel, Placement fid) {
-        Footprint footprint = fid.getPart().getPackage().getFootprint();
+    private static BufferedImage createTemplate(Location unitsPerPixel, Footprint footprint) {
         Shape shape = footprint.getShape();
         
         // Determine the scaling factor to go from Outline units to
