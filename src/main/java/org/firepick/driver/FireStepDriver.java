@@ -38,33 +38,39 @@ import java.util.concurrent.TimeoutException;
 
 import javax.swing.Action;
 
+import org.firepick.delta.CarouselFeeder;
 import org.firepick.driver.wizards.FireStepDriverWizard;
 import org.firepick.gfilter.GCoordinate;
 import org.firepick.gfilter.MappedPointFilter;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
 import org.firepick.model.RawStepTriplet;
-import org.openpnp.gui.MachineControlsPanel;
+import org.openpnp.ConfigurationListener;
 import org.openpnp.gui.MainFrame;
 import org.openpnp.gui.support.PropertySheetWizardAdapter;
 import org.openpnp.gui.support.Wizard;
 import org.openpnp.machine.reference.ReferenceActuator;
+import org.openpnp.machine.reference.ReferenceCamera;
 import org.openpnp.machine.reference.ReferenceHead;
 import org.openpnp.machine.reference.ReferenceHeadMountable;
 import org.openpnp.machine.reference.ReferenceMachine;
 import org.openpnp.machine.reference.ReferenceNozzle;
 import org.openpnp.machine.reference.driver.AbstractSerialPortDriver;
 import org.openpnp.model.Configuration;
+import org.openpnp.model.Footprint;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
-import org.openpnp.spi.Camera;
 import org.openpnp.spi.PropertySheetHolder;
+import org.openpnp.vision.FiducialLocator;
 import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.Element;
+import org.simpleframework.xml.ElementList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 
 
 public class FireStepDriver extends AbstractSerialPortDriver implements Runnable {
@@ -92,7 +98,41 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Attribute(required=false)
 	private boolean useGfilter = false;
 	
+	@ElementList(required=false)
+	private List<CarouselDriver> carouselDrivers = new ArrayList<CarouselDriver>();
+	
 	private MappedPointFilter gFilter;
+	
+	public FireStepDriver() {
+	    Configuration.get().addListener(new ConfigurationListener() {
+            @Override
+            public void configurationLoaded(Configuration configuration)
+                    throws Exception {
+                // TODO Auto-generated method stub
+                
+            }
+            
+            @Override
+            public void configurationComplete(Configuration configuration)
+                    throws Exception {
+                ReferenceMachine machine = (ReferenceMachine) configuration.getMachine();
+                machine.registerFeederClass(CarouselFeeder.class);
+                
+                for (CarouselDriver driver : carouselDrivers) {
+                    driver.setMachineDriver(FireStepDriver.this);
+                }
+            }
+        });
+	}
+	
+	public CarouselDriver getCarouselDriver(int address) {
+	    for (CarouselDriver driver : carouselDrivers) {
+	        if (driver.getAddress() == address) {
+	            return driver;
+	        }
+	    }
+	    return null;
+	}
 	
 	@Override
 	public void setEnabled(boolean enabled) throws Exception {
@@ -122,6 +162,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    		enableEndEffectorRingLight(true); 		// Turn off down-looking LED ring light
 				Thread.sleep(50,0);                 	// Delay for a bit, wait for power supply to stabilize.
 		        home(null);                         	// home the machine
+		        for (CarouselDriver carouselDriver : carouselDrivers) {
+		            carouselDriver.home();
+		        }
 	        }
 			
 	    } //if (enabled)
@@ -533,24 +576,85 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         MainFrame.machineControlsPanel.submitMachineTask(new Runnable() {
             @Override
             public void run() {
+                Footprint footprint = Configuration.get().getPart("FIDUCIAL-1X2").getPackage().getFootprint();
+                JsonArray points = new JsonArray();
+                JsonObject map = new JsonObject();
+                map.add("map", points);
                 try {
-                    Camera camera = Configuration.get().getMachine().getHeads().get(0).getCameras().get(0);
+                    ReferenceCamera camera = (ReferenceCamera) Configuration.get().getMachine().getHeads().get(0).getCameras().get(0);
                     Location startLocation = camera.getLocation();
-                    int gridX = 9, gridY = 9;
+                    int gridX = 19, gridY = 19;
                     double deltaX = 10, deltaY = 10;
                     for (int y = -gridY / 2; y <= gridY / 2; y++) {
                         for (int x = -gridX / 2; x <= gridX / 2; x++) {
                             Location location = startLocation.add(new Location(LengthUnit.Millimeters, x * deltaX, y * deltaY, 0, 0));
                             camera.moveTo(location, 1.0);
-                            Thread.sleep(500);
+                            Location visionLocation = null;
+                            for (int i = 0; i < 3; i++) {
+                                visionLocation = FiducialLocator.getFiducialLocation(footprint, camera);
+                                if (visionLocation == null) {
+                                    throw new Exception("No point found");
+                                }
+                                camera.moveTo(visionLocation, 1.0);
+                            }
+                            location = location.subtract(camera.getHeadOffsets());
+                            visionLocation = visionLocation.subtract(camera.getHeadOffsets());
+                            logger.debug("{} -> {} -> {}", location, visionLocation);
+                            addDomainAndRangeTimesThree(points, location, visionLocation);
                         }
                     }
                 }
                 catch (Exception e) {
                     e.printStackTrace();
                 }
+                logger.debug(map.toString());
             }
         });
+    }
+    
+    private void addDomainAndRangeTimesThree(JsonArray points, Location location, Location visionLocation) {
+        JsonArray domain;
+        JsonArray range;
+        JsonObject o;
+        
+        o = new JsonObject();
+        domain = new JsonArray();
+        range = new JsonArray();
+        domain.add(new JsonPrimitive(location.getX()));
+        domain.add(new JsonPrimitive(location.getY()));
+        domain.add(new JsonPrimitive(location.getZ()));
+        range.add(new JsonPrimitive(visionLocation.getX()));
+        range.add(new JsonPrimitive(visionLocation.getY()));
+        range.add(new JsonPrimitive(visionLocation.getZ()));
+        o.add("domain", domain);
+        o.add("range", range);
+        points.add(o);
+        
+        o = new JsonObject();
+        domain = new JsonArray();
+        range = new JsonArray();
+        domain.add(new JsonPrimitive(location.getX()));
+        domain.add(new JsonPrimitive(location.getY()));
+        domain.add(new JsonPrimitive(location.getZ() - 10));
+        range.add(new JsonPrimitive(visionLocation.getX()));
+        range.add(new JsonPrimitive(visionLocation.getY()));
+        range.add(new JsonPrimitive(visionLocation.getZ() - 10));
+        o.add("domain", domain);
+        o.add("range", range);
+        points.add(o);
+        
+        o = new JsonObject();
+        domain = new JsonArray();
+        range = new JsonArray();
+        domain.add(new JsonPrimitive(location.getX()));
+        domain.add(new JsonPrimitive(location.getY()));
+        domain.add(new JsonPrimitive(location.getZ() + 10));
+        range.add(new JsonPrimitive(visionLocation.getX()));
+        range.add(new JsonPrimitive(visionLocation.getY()));
+        range.add(new JsonPrimitive(visionLocation.getZ() + 10));
+        o.add("domain", domain);
+        o.add("range", range);
+        points.add(o);
     }
     
 	private void setMotorDirection(boolean xyz, boolean rot, boolean enable) throws Exception {
@@ -615,7 +719,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		toggleDigitalPin(26,enable);
 	}
 
-	private void toggleDigitalPin(int pin, boolean state) throws Exception {
+	public void toggleDigitalPin(int pin, boolean state) throws Exception {
 	    logger.trace(String.format("FireStep: Toggling digital pin %d to %s", pin, state?"HIGH":"LOW" ));
         try {
 			sendJsonCommand(String.format("{'iod%d':%s}", pin, state?"true":"false"),100);
