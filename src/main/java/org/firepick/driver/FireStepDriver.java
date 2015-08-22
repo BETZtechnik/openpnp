@@ -82,6 +82,11 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private double nozzleStepsPerDegree =  8.888888888;
 	private boolean nozzleEnabled = false;
 	private boolean powerSupplyOn = false;
+	@Element(required=false)
+	private boolean usePwmVacuum = true; // Intended to provide legacy support for older FireStep versions.. might remove this later.
+	@Element(required=false)
+	private int PwmVacuumSetting = 50;   // Provides a default value.  This might change later depending on whether we want to 
+	                                     // run the pump harder for larger parts (might depend on nozzle, part size, etc..).
 	
 	@Element(required=false)
 	private RotatableDeltaKinematicsCalculator deltaCalculator = new RotatableDeltaKinematicsCalculator();
@@ -724,13 +729,35 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
 	private void enableVacuumPump(boolean enable) throws Exception {
 	    logger.trace(String.format("FireStep: Vacuum pump: %s", enable?"Enabled":"Disabled" ));
-		toggleDigitalPin(26,enable);
+		if (usePwmVacuum) {
+		    setPwmPin(26,enable?PwmVacuumSetting:0);
+		}
+		else {
+			toggleDigitalPin(26,enable); //Legacy support for older firestep users
+		}
+			
+	}
+	
+	public void setVacuumPumpPwm(int value) {
+		PwmVacuumSetting = value;
+		//TODO: Exception if PWM level is outside of 0-255
 	}
 
 	public void toggleDigitalPin(int pin, boolean state) throws Exception {
 	    logger.trace(String.format("FireStep: Toggling digital pin %d to %s", pin, state?"HIGH":"LOW" ));
         try {
 			sendJsonCommand(String.format("{'iod%d':%s}", pin, state?"true":"false"),100);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void setPwmPin(int pin, int value) throws Exception {
+	    logger.trace(String.format("FireStep: Setting PWM pin %d to %d", pin, value ));
+        try {
+        	//TODO: Throw an exception if value is not between 0 and 255.
+			sendJsonCommand(String.format("{'ioa%d':%d}", pin, value),100);
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
