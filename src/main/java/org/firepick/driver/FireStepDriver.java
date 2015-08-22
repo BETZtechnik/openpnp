@@ -59,6 +59,7 @@ import org.openpnp.model.Configuration;
 import org.openpnp.model.Footprint;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
+import org.openpnp.spi.Nozzle;
 import org.openpnp.spi.PropertySheetHolder;
 import org.openpnp.vision.FiducialLocator;
 import org.simpleframework.xml.Attribute;
@@ -102,6 +103,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private List<CarouselDriver> carouselDrivers = new ArrayList<CarouselDriver>();
 	
 	private MappedPointFilter gFilter;
+	
+	private boolean homed = false;
 	
 	public FireStepDriver() {
 	    Configuration.get().addListener(new ConfigurationListener() {
@@ -194,9 +197,14 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
 	@Override
 	public void home(ReferenceHead head) throws Exception {
+//	    Nozzle nozzle = head.getNozzles().get(0);
+//	    if (homed && nozzle.getLocation().getLinearDistanceTo(0, 0) > 90) {
+//	        nozzle.moveTo(new Location(LengthUnit.Millimeters, 0, 0, 0, 0), 1.0);
+//	    }
         RawStepTriplet rs = deltaCalculator.getHomeRawSteps();
         sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
         setLocation(getFireStepLocation());
+        homed = true;
 	}
 	
 	@Override
