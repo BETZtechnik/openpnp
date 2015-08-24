@@ -76,7 +76,7 @@ public class FireSight {
     public static RotatedRect parseRotatedRect(JsonObject o) {
         Point p = new Point(o.get("x").getAsDouble(), o.get("y").getAsDouble());
         Size s = new Size(o.get("width").getAsDouble(), o.get("height").getAsDouble());
-        double a = o.get("width").getAsDouble();
+        double a = o.get("angle").getAsDouble();
         RotatedRect r = new RotatedRect(p, s, a);
         return r;
     }

@@ -98,42 +98,6 @@ public class CarouselFeeder extends ReferenceFeeder {
     }
     
     /**
-     * Helper function for wizard training.
-     * @param nozzle
-     * @param camera
-     * @return
-     */
-    public RotatedRect findOnePart(Nozzle nozzle, Camera camera) throws Exception {
-        RotatedRect bestMatch = null;
-        for (int i = 0; i < 3; i++) {
-            Thread.sleep(500);
-            BufferedImage image = camera.capture();
-            FireSightResult result = FireSight.fireSight(image, "multiPartDetect.json");
-            List<RotatedRect> rects = FireSight
-                    .parseRotatedRects(result.model.get("filtered")
-                            .getAsJsonObject().get("rects").getAsJsonArray());
-            bestMatch = findClosestMatch(rects, camera);
-            // RotatedRect returns angles from 0 to -90, no matter which
-            // size of the rectangle is the larger. So as the long side
-            // rotates through 90 degrees the angle is reset. We want
-            // to normalize that so we offset the angle by 90 degrees if
-            // the height is the longer side.
-            if (bestMatch.size.width < bestMatch.size.height) {
-                bestMatch.angle -= 90;
-            }
-            bestMatch.angle = Math.abs(bestMatch.angle);
-            Location l = VisionUtils.getPixelCenterOffsets(
-                    camera, 
-                    (int) bestMatch.center.x, 
-                    (int) bestMatch.center.y);
-            l = camera.getLocation().subtract(l);
-            l = l.derive(null, null, null, bestMatch.angle);
-            camera.moveTo(l, 1.0);
-        }
-        return bestMatch;
-    }
-    
-    /**
      * Filter invalid results and then sort by distance from center.
      * @param rects
      * @return

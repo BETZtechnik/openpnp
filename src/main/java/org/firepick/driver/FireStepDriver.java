@@ -584,14 +584,15 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         MainFrame.machineControlsPanel.submitMachineTask(new Runnable() {
             @Override
             public void run() {
-                Footprint footprint = Configuration.get().getPart("FIDUCIAL-1X2").getPackage().getFootprint();
                 JsonArray points = new JsonArray();
                 JsonObject map = new JsonObject();
                 map.add("map", points);
                 try {
+                    Footprint footprint = Configuration.get().getPart("TESTPKG-R0805-TESTPKG-RESISTOR0805").getPackage().getFootprint();
                     ReferenceCamera camera = (ReferenceCamera) Configuration.get().getMachine().getHeads().get(0).getCameras().get(0);
                     Location startLocation = camera.getLocation();
-                    int gridX = 19, gridY = 19;
+//                    int gridX = 19, gridY = 19;
+                    int gridX = 3, gridY = 3;
                     double deltaX = 10, deltaY = 10;
                     for (int y = -gridY / 2; y <= gridY / 2; y++) {
                         for (int x = -gridX / 2; x <= gridX / 2; x++) {
@@ -601,6 +602,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                             for (int i = 0; i < 3; i++) {
                                 visionLocation = FiducialLocator.getFiducialLocation(footprint, camera);
                                 if (visionLocation == null) {
+                                    // TODO: Don't abort the entire map, just this point.
                                     throw new Exception("No point found");
                                 }
                                 camera.moveTo(visionLocation, 1.0);
@@ -714,12 +716,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
 	private void enableEndEffectorRingLight(boolean enable) throws Exception {
 	    logger.trace(String.format("FireStep: End effector LED ring light: %s", enable?"Turned ON":"Turned OFF" ));
-		toggleDigitalPin(4,enable);
+		toggleDigitalPin(5,enable);
 	}
 	
 	private void enableUpLookingRingLight(boolean enable) throws Exception {
 	    logger.trace(String.format("FireStep: Up-looking LED ring light: %s", enable?"Turned ON":"Turned OFF" ));
-		toggleDigitalPin(5,enable);
+		toggleDigitalPin(4,enable);
 	}
 	
 	private void enableVacuumPump(boolean enable) throws Exception {
