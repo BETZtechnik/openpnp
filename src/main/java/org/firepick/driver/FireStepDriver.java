@@ -596,26 +596,31 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                     Footprint footprint = Configuration.get().getPart("TESTPKG-R0805-TESTPKG-RESISTOR0805").getPackage().getFootprint();
                     ReferenceCamera camera = (ReferenceCamera) Configuration.get().getMachine().getHeads().get(0).getCameras().get(0);
                     Location startLocation = camera.getLocation();
-//                    int gridX = 19, gridY = 19;
-                    int gridX = 3, gridY = 3;
+                    int gridX = 19, gridY = 19;
+//                    int gridX = 3, gridY = 3;
                     double deltaX = 10, deltaY = 10;
                     for (int y = -gridY / 2; y <= gridY / 2; y++) {
                         for (int x = -gridX / 2; x <= gridX / 2; x++) {
-                            Location location = startLocation.add(new Location(LengthUnit.Millimeters, x * deltaX, y * deltaY, 0, 0));
-                            camera.moveTo(location, 1.0);
-                            Location visionLocation = null;
-                            for (int i = 0; i < 3; i++) {
-                                visionLocation = FiducialLocator.getFiducialLocation(footprint, camera);
-                                if (visionLocation == null) {
-                                    // TODO: Don't abort the entire map, just this point.
-                                    throw new Exception("No point found");
+                            try {
+                                Location location = startLocation.add(new Location(LengthUnit.Millimeters, x * deltaX, y * deltaY, 0, 0));
+                                camera.moveTo(location, 1.0);
+                                Location visionLocation = null;
+                                for (int i = 0; i < 3; i++) {
+                                    visionLocation = FiducialLocator.getFiducialLocation(footprint, camera);
+                                    if (visionLocation == null) {
+                                        // TODO: Don't abort the entire map, just this point.
+                                        throw new Exception("No point found");
+                                    }
+                                    camera.moveTo(visionLocation, 1.0);
                                 }
-                                camera.moveTo(visionLocation, 1.0);
+                                location = location.subtract(camera.getHeadOffsets());
+                                visionLocation = visionLocation.subtract(camera.getHeadOffsets());
+                                logger.debug("{} -> {} -> {}", location, visionLocation);
+                                addDomainAndRange(points, location, visionLocation);
                             }
-                            location = location.subtract(camera.getHeadOffsets());
-                            visionLocation = visionLocation.subtract(camera.getHeadOffsets());
-                            logger.debug("{} -> {} -> {}", location, visionLocation);
-                            addDomainAndRangeTimesThree(points, location, visionLocation);
+                            catch (Exception e) {
+                                System.out.println("point failed");
+                            }
                         }
                     }
                 }
@@ -627,7 +632,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         });
     }
     
-    private void addDomainAndRangeTimesThree(JsonArray points, Location location, Location visionLocation) {
+    private void addDomainAndRange(JsonArray points, Location location, Location visionLocation) {
         JsonArray domain;
         JsonArray range;
         JsonObject o;
@@ -641,32 +646,6 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         range.add(new JsonPrimitive(visionLocation.getX()));
         range.add(new JsonPrimitive(visionLocation.getY()));
         range.add(new JsonPrimitive(visionLocation.getZ()));
-        o.add("domain", domain);
-        o.add("range", range);
-        points.add(o);
-        
-        o = new JsonObject();
-        domain = new JsonArray();
-        range = new JsonArray();
-        domain.add(new JsonPrimitive(location.getX()));
-        domain.add(new JsonPrimitive(location.getY()));
-        domain.add(new JsonPrimitive(location.getZ() - 10));
-        range.add(new JsonPrimitive(visionLocation.getX()));
-        range.add(new JsonPrimitive(visionLocation.getY()));
-        range.add(new JsonPrimitive(visionLocation.getZ() - 10));
-        o.add("domain", domain);
-        o.add("range", range);
-        points.add(o);
-        
-        o = new JsonObject();
-        domain = new JsonArray();
-        range = new JsonArray();
-        domain.add(new JsonPrimitive(location.getX()));
-        domain.add(new JsonPrimitive(location.getY()));
-        domain.add(new JsonPrimitive(location.getZ() + 10));
-        range.add(new JsonPrimitive(visionLocation.getX()));
-        range.add(new JsonPrimitive(visionLocation.getY()));
-        range.add(new JsonPrimitive(visionLocation.getZ() + 10));
         o.add("domain", domain);
         o.add("range", range);
         points.add(o);
