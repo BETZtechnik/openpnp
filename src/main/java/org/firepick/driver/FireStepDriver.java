@@ -59,7 +59,6 @@ import org.openpnp.model.Configuration;
 import org.openpnp.model.Footprint;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
-import org.openpnp.spi.Nozzle;
 import org.openpnp.spi.PropertySheetHolder;
 import org.openpnp.vision.FiducialLocator;
 import org.simpleframework.xml.Attribute;
@@ -103,11 +102,14 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
 	@Attribute(required=false)
 	private boolean useGfilter = false;
-	
+    private MappedPointFilter gFilter;
+    
+    @Attribute(required=false)
+    private boolean useBarycentric = false;
+    private BarycentricInterpolation barycentric;
+    
 	@ElementList(required=false)
 	private List<CarouselDriver> carouselDrivers = new ArrayList<CarouselDriver>();
-	
-	private MappedPointFilter gFilter;
 	
 	private boolean homed = false;
 	
@@ -145,13 +147,20 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Override
 	public void setEnabled(boolean enabled) throws Exception {
 	    if (enabled) {
-	        if (useGfilter) {
-	            File file = new File(Configuration.get().getConfigurationDirectory(), "gfilter.json");
-	            gFilter = new ConcreteMappedPointFilter(new FileReader(file));
-	        }
-	        else {
-	            gFilter = null;
-	        }
+            if (useGfilter) {
+                File file = new File(Configuration.get().getConfigurationDirectory(), "gfilter.json");
+                gFilter = new ConcreteMappedPointFilter(new FileReader(file));
+            }
+            else {
+                gFilter = null;
+            }
+            if (useBarycentric) {
+                File file = new File(Configuration.get().getConfigurationDirectory(), "barycentric.json");
+                barycentric = new BarycentricInterpolation(new FileReader(file));
+            }
+            else {
+                barycentric = null;
+            }
 	        if (!connected) {
 	            try {
 	                connect();
@@ -242,6 +251,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             GCoordinate mappedCoord = gFilter.interpolate(coord);
             logger.debug("gFilter mapped: {} -> {} -> {}", new Object[] { scaledLocation, coord, mappedCoord });
             scaledLocation = scaledLocation.derive(mappedCoord.getX(), mappedCoord.getY(), null, null);
+        }
+        if (useBarycentric) {
+            scaledLocation = barycentric.interpolate(scaledLocation);
         }
 	    
         moveToRaw(hm, scaledLocation, speed);

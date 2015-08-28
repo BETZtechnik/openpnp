@@ -36,6 +36,7 @@ import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.prefs.Preferences;
 
@@ -384,6 +385,10 @@ public class JobPanel extends JPanel {
         JButton btnEditFeeder = new JButton(editPlacementFeederAction);
         btnEditFeeder.setHideActionText(true);
         toolBarPlacements.add(btnEditFeeder);
+        
+        toolBarPlacements.addSeparator();
+        toolBarPlacements.add(captureGilterLocation);
+        toolBarPlacements.add(dumpGilterLocations);
 		
 		pnlPlacements.add(new JScrollPane(placementsTable));
 
@@ -1257,6 +1262,38 @@ public class JobPanel extends JPanel {
             }
         }
     }
+    
+    HashMap<String, Location[]> gfilterLocations = new HashMap<>();
+    public final Action captureGilterLocation = new AbstractAction("Capture Gfilter") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            Location placementLocation = 
+                    Utils2D.calculateBoardPlacementLocation(
+                            getSelectedBoardLocation().getLocation(),
+                            getSelectedBoardLocation().getSide(),
+                            getSelectedPlacement().getLocation());
+            Location location = MainFrame.mainFrame.cameraPanel.getSelectedCameraLocation();
+            System.out.println(placementLocation + " -> " + location);
+            gfilterLocations.put(getSelectedPlacement().getId(), new Location[] { placementLocation, location });
+        }
+    };
+    
+    public final Action dumpGilterLocations = new AbstractAction("Dump Gfilter") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            for (String placementId : gfilterLocations.keySet()) {
+                Location[] locations = gfilterLocations.get(placementId);
+                Location placementLocation = locations[0];
+                Location location = locations[1];
+                System.out.println(String.format("%s\t%f\t%f\t%f\t%f",
+                        placementId,
+                        placementLocation.getX(),
+                        placementLocation.getY(),
+                        location.getX(),
+                        location.getY()));
+            }
+        }
+    };
     
 	private final JobProcessorListener jobProcessorListener = new JobProcessorListener.Adapter() {
 		@Override
