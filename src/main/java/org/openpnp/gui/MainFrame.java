@@ -67,8 +67,10 @@ import org.openpnp.ConfigurationListener;
 import org.openpnp.JobProcessorListener;
 import org.openpnp.gui.components.CameraPanel;
 import org.openpnp.gui.importer.BoardImporter;
+import org.openpnp.gui.importer.EagleBoardImporter;
 import org.openpnp.gui.importer.EagleMountsmdUlpImporter;
 import org.openpnp.gui.importer.KicadPosImporter;
+import org.openpnp.gui.importer.NamedCSVImporter;
 import org.openpnp.gui.support.HeadCellValue;
 import org.openpnp.gui.support.LengthCellValue;
 import org.openpnp.gui.support.MessageBoxes;
@@ -476,8 +478,10 @@ public class MainFrame extends JFrame {
 	}
 	
 	private void registerBoardImporters() {
+        registerBoardImporter(EagleBoardImporter.class);
         registerBoardImporter(EagleMountsmdUlpImporter.class);
         registerBoardImporter(KicadPosImporter.class);
+        registerBoardImporter(NamedCSVImporter.class);
 	}
 	
     /**
