@@ -54,6 +54,7 @@ import org.openpnp.machine.reference.ReferenceHead;
 import org.openpnp.machine.reference.ReferenceHeadMountable;
 import org.openpnp.machine.reference.ReferenceMachine;
 import org.openpnp.machine.reference.ReferenceNozzle;
+import org.openpnp.machine.reference.ReferencePasteDispenser;
 import org.openpnp.machine.reference.driver.AbstractSerialPortDriver;
 import org.openpnp.model.Configuration;
 import org.openpnp.model.Footprint;
@@ -171,6 +172,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	            }
 	        }
 	        enableVacuumPump(false);              		// Turn the vacuum pump OFF
+	        enableDispenser(false);
 	        enablePowerSupply(true);              		// Turn power supply ON
 	        if (powerSupplyOn)					  		// Exception should catch but guard just in case
 	        {
@@ -193,7 +195,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    		if (powerSupplyOn)
 	    		{
 			        home(null);                        	// home the machine
-			        enableVacuumPump(false);           	// Turn the vacuum pump OFF
+                    enableVacuumPump(false);            // Turn the vacuum pump OFF
+                    enableDispenser(false);
 					setXyzMotorEnable(false);  			// Disable power for XYZ stepper motors
 			        enablePowerSupply(false);          	// Turn off the power supply
 	    		}
@@ -210,6 +213,15 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	}
 	
 	@Override
+    public void dispense(ReferencePasteDispenser dispenser,
+            Location startLocation, Location endLocation,
+            long dispenseTimeMilliseconds) throws Exception {
+	    enableDispenser(true);
+	    Thread.sleep(dispenseTimeMilliseconds);
+        enableDispenser(false);
+    }
+
+    @Override
 	public void home(ReferenceHead head) throws Exception {
 //	    Nozzle nozzle = head.getNozzles().get(0);
 //	    if (homed && nozzle.getLocation().getLinearDistanceTo(0, 0) > 90) {
@@ -729,6 +741,10 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 			toggleDigitalPin(26,enable); //Legacy support for older firestep users
 		}
 			
+	}
+	
+	private void enableDispenser(boolean enable) throws Exception {
+	    toggleDigitalPin(50, enable);
 	}
 	
 	public void setVacuumPumpPwm(int value) {
