@@ -112,6 +112,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@ElementList(required=false)
 	private List<CarouselDriver> carouselDrivers = new ArrayList<CarouselDriver>();
 	
+	@Attribute(required=false)
+	private long dispenseTimeMilliseconds = 400;
+	
 	private boolean homed = false;
 	
 	public FireStepDriver() {
@@ -217,7 +220,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             Location startLocation, Location endLocation,
             long dispenseTimeMilliseconds) throws Exception {
 	    enableDispenser(true);
-	    Thread.sleep(dispenseTimeMilliseconds);
+	    Thread.sleep(this.dispenseTimeMilliseconds);
         enableDispenser(false);
     }
 
