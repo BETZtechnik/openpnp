@@ -27,10 +27,13 @@ along with OpenPnP.  If not, see <http://www.gnu.org/licenses/>.
 
 package org.firepick.driver;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -39,6 +42,8 @@ import java.util.concurrent.TimeoutException;
 import javax.swing.Action;
 
 import org.firepick.delta.CarouselFeeder;
+import org.firepick.delta.FireSight;
+import org.firepick.delta.FireSight.FireSightResult;
 import org.firepick.driver.wizards.FireStepDriverWizard;
 import org.firepick.gfilter.GCoordinate;
 import org.firepick.gfilter.MappedPointFilter;
@@ -57,11 +62,12 @@ import org.openpnp.machine.reference.ReferenceNozzle;
 import org.openpnp.machine.reference.ReferencePasteDispenser;
 import org.openpnp.machine.reference.driver.AbstractSerialPortDriver;
 import org.openpnp.model.Configuration;
-import org.openpnp.model.Footprint;
+import org.openpnp.model.Length;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
+import org.openpnp.spi.Camera;
 import org.openpnp.spi.PropertySheetHolder;
-import org.openpnp.vision.FiducialLocator;
+import org.openpnp.util.VisionUtils;
 import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.Element;
 import org.simpleframework.xml.ElementList;
@@ -69,6 +75,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
@@ -608,6 +615,11 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
     }
     
     public void generateGfilter() throws Exception {
+        final int gridX = 19, gridY = 19;
+        final double deltaX = 10, deltaY = 10;
+        final int numTries = 10;
+        final double maxErrorDistance = 5;
+        final double minErrorDistance = 0.1;
         /*
          * Assume the current position is the start position, which is 0,0.
          * We will use the start position's Z for the entire operation.
@@ -619,44 +631,122 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 JsonArray points = new JsonArray();
                 JsonObject map = new JsonObject();
                 map.add("map", points);
+                ReferenceCamera camera = (ReferenceCamera) Configuration.get().getMachine().getHeads().get(0).getCameras().get(0);
+                Location startLocation = camera.getLocation();
                 try {
-                    Footprint footprint = Configuration.get().getPart("TESTPKG-R0805-TESTPKG-RESISTOR0805").getPackage().getFootprint();
-                    ReferenceCamera camera = (ReferenceCamera) Configuration.get().getMachine().getHeads().get(0).getCameras().get(0);
-                    Location startLocation = camera.getLocation();
-                    int gridX = 19, gridY = 19;
-//                    int gridX = 3, gridY = 3;
-                    double deltaX = 10, deltaY = 10;
+                    List<Location> locations = new ArrayList<>();
                     for (int y = -gridY / 2; y <= gridY / 2; y++) {
                         for (int x = -gridX / 2; x <= gridX / 2; x++) {
-                            try {
-                                Location location = startLocation.add(new Location(LengthUnit.Millimeters, x * deltaX, y * deltaY, 0, 0));
-                                camera.moveTo(location, 1.0);
-                                Location visionLocation = null;
-                                for (int i = 0; i < 3; i++) {
-                                    visionLocation = FiducialLocator.getFiducialLocation(footprint, camera);
-                                    if (visionLocation == null) {
-                                        // TODO: Don't abort the entire map, just this point.
-                                        throw new Exception("No point found");
-                                    }
-                                    camera.moveTo(visionLocation, 1.0);
-                                }
-                                location = location.subtract(camera.getHeadOffsets());
-                                visionLocation = visionLocation.subtract(camera.getHeadOffsets());
-                                logger.debug("{} -> {} -> {}", location, visionLocation);
-                                addDomainAndRange(points, location, visionLocation);
+                            Location location = startLocation.add(new Location(LengthUnit.Millimeters, x * deltaX, y * deltaY, 0, 0));
+                            locations.add(location);
+                        }
+                    }
+
+                    for (Location location : locations) {
+                        Location visionLocation = location;
+                        boolean found = false;
+                        for (int i = 0; i < numTries; i++) {
+                            // move to where we expect to find the circle
+                            camera.moveTo(visionLocation, 1.0);
+                            
+                            // find the circle
+                            Location visionLocation2 = findCircle(camera);
+                            
+                            // if nothing found, loop and try again
+                            if (visionLocation2 == null) {
+                                continue;
                             }
-                            catch (Exception e) {
-                                System.out.println("point failed");
+                            
+                            // update units so we can do some unit independent math
+                            visionLocation = visionLocation.convertToUnits(LengthUnit.Millimeters);
+                            visionLocation2 = visionLocation2.convertToUnits(LengthUnit.Millimeters);
+                            
+                            // if the circle we found is more than 5mm from the point where
+                            // it should be then we probably have a vision problem, so reset
+                            // back to the original location and try again
+                            if (Math.abs(visionLocation2.getLinearDistanceTo(location)) > maxErrorDistance) {
+                                logger.warn("Got too far away from location, starting over.");
+                                visionLocation = location;
+                                continue;
                             }
+                            
+                            // See how far we moved since the last try
+                            double distance = visionLocation2.getLinearDistanceTo(visionLocation);
+                            distance = Math.abs(distance);
+                            
+                            // Update the running location with the new one
+                            visionLocation = visionLocation2;
+                            
+                            // If we moved less than 0.1 to find the new location then we're probably
+                            // just circling the ideal, so call it good
+                            if (distance < minErrorDistance) {
+                                logger.info("FOUND {} / {} / {} -> {} -> {} {}", new Object[] {
+                                        visionLocation.subtract(location),
+                                        distance,
+                                        i + 1,
+                                        location,
+                                        visionLocation,
+                                        location.subtract(startLocation)
+                                });
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            logger.warn("FAILED {} {}", location, location.subtract(startLocation));
+                        }
+                        else {
+                            location = location.subtract(camera.getHeadOffsets());
+                            visionLocation = visionLocation.subtract(camera.getHeadOffsets());
+                            logger.debug("{} -> {} -> {}", location, visionLocation);
+                            addDomainAndRange(points, location, visionLocation);
                         }
                     }
                 }
                 catch (Exception e) {
                     e.printStackTrace();
                 }
-                logger.debug(map.toString());
+                logger.info(map.toString());
             }
         });
+    }
+    
+    /**
+     * Find the closest circle of the specified diameter using the given
+     * camera. This function is tuned specifically for finding circles
+     * of 2.5mm on a 10mm x 10mm calibration grid.
+     * @param diameter
+     * @param camera
+     * @return
+     * @throws Exception
+     */
+    private Location findCircle(Camera camera) throws Exception {
+        Thread.sleep(1000);
+        BufferedImage image = camera.capture();
+        FireSightResult result = FireSight.fireSight(image, "calibration-hough.json");
+        return getClosestCircleLocation(result.model, camera);
+    }
+    
+    private Location getClosestCircleLocation(JsonObject model, final Camera camera) {
+        List<Location> locations = new ArrayList<>();
+        for (JsonElement e : model.get("s1").getAsJsonObject().get("circles").getAsJsonArray()) {
+            JsonObject circle = e.getAsJsonObject();
+            double x = circle.get("x").getAsDouble();
+            double y = circle.get("y").getAsDouble();
+            Location offsets = VisionUtils.getPixelCenterOffsets(camera, (int) x, (int) y);
+            locations.add(camera.getLocation().subtract(offsets)); 
+        }
+        Collections.sort(locations, new Comparator<Location>() {
+            public int compare(Location o1, Location o2) {
+                Double o1d = camera.getLocation().getLinearDistanceTo(o1); 
+                Double o2d = camera.getLocation().getLinearDistanceTo(o2);
+                return o1d.compareTo(o2d);
+            }
+        });
+        if (locations.isEmpty()) {
+            return null;
+        }
+        return locations.get(0);
     }
     
     private void addDomainAndRange(JsonArray points, Location location, Location visionLocation) {
