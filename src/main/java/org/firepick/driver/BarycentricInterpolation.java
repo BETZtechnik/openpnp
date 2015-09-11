@@ -1,5 +1,6 @@
 package org.firepick.driver;
 
+import java.awt.geom.Point2D;
 import java.io.File;
 import java.io.FileReader;
 import java.io.Reader;
@@ -8,8 +9,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import javax.vecmath.Point2d;
 
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
@@ -29,7 +28,7 @@ import com.google.gson.JsonParser;
  */
 public class BarycentricInterpolation {
     private static final Logger logger = LoggerFactory.getLogger(BarycentricInterpolation.class);
-    private Map<Point2d, Point2d> map = new HashMap<>();
+    private Map<Point2D.Double, Point2D.Double> map = new HashMap<>();
     
     /**
      * Create an interpolator by parsing a gfilter style mapping from the
@@ -43,8 +42,8 @@ public class BarycentricInterpolation {
             JsonObject o1 = e.getAsJsonObject();
             JsonArray domain = o1.get("domain").getAsJsonArray();
             JsonArray range = o1.get("range").getAsJsonArray();
-            Point2d pDomain = new Point2d(domain.get(0).getAsDouble(), domain.get(1).getAsDouble());
-            Point2d pRange = new Point2d(range.get(0).getAsDouble(), range.get(1).getAsDouble());
+            Point2D.Double pDomain = new Point2D.Double(domain.get(0).getAsDouble(), domain.get(1).getAsDouble());
+            Point2D.Double pRange = new Point2D.Double(range.get(0).getAsDouble(), range.get(1).getAsDouble());
             map.put(pDomain, pRange);
         }
     }
@@ -53,16 +52,16 @@ public class BarycentricInterpolation {
         
     }
     
-    public void addPoint(Point2d domain, Point2d range) {
+    public void addPoint(Point2D.Double domain, Point2D.Double range) {
         map.put(domain, range);
     }
     
-    public Map<Point2d, Point2d> getMap() {
+    public Map<Point2D.Double, Point2D.Double> getMap() {
         return map;
     }
     
     public Location interpolate(Location location) {
-        Point2d p = interpolate(new Point2d(location.getX(), location.getY()));
+        Point2D.Double p = interpolate(new Point2D.Double(location.getX(), location.getY()));
         Location ret = location.derive(p.x, p.y, null, null);
         logger.debug("{} -> {}", location, ret);
         return ret;
@@ -74,16 +73,16 @@ public class BarycentricInterpolation {
      * @param point
      * @return
      */
-    private Point2d interpolate(final Point2d point) {
+    private Point2D.Double interpolate(final Point2D.Double point) {
         // find the three nearest points to the given point
-        List<Point2d> sorted = new ArrayList<>(map.keySet());
-        sorted.sort(new Comparator<Point2d>() {
+        List<Point2D.Double> sorted = new ArrayList<>(map.keySet());
+        sorted.sort(new Comparator<Point2D.Double>() {
             @Override
-            public int compare(Point2d o1, Point2d o2) {
+            public int compare(Point2D.Double o1, Point2D.Double o2) {
                 return Double.compare(point.distance(o1), point.distance(o2));
             }
         });
-        Point2d a1 = sorted.get(0), b1 = sorted.get(1), c1 = sorted.get(2);
+        Point2D.Double a1 = sorted.get(0), b1 = sorted.get(1), c1 = sorted.get(2);
         int lastPoint = 3;
         while (!isTriangle(a1, b1, c1)) {
             logger.debug("Bad triangle ({}, {}, {}), trying again.", new Object[] { a1, b1, c1 });
@@ -95,21 +94,21 @@ public class BarycentricInterpolation {
             return point;
         }
         
-        Point2d a2 = map.get(a1);
-        Point2d b2 = map.get(b1);
-        Point2d c2 = map.get(c1);
+        Point2D.Double a2 = map.get(a1);
+        Point2D.Double b2 = map.get(b1);
+        Point2D.Double c2 = map.get(c1);
         logger.debug("({}, {}, {}) -> ({}, {}, {})", new Object[] { a1, b1, c1, a2, b2, c2 });
         return barycentric(point, a1, b1, c1, a2, b2, c2);
     }
     
-    private boolean isTriangle(Point2d a, Point2d b, Point2d c) {
+    private boolean isTriangle(Point2D.Double a, Point2D.Double b, Point2D.Double c) {
         double A = a.distance(b);
         double B = b.distance(c);
         double C = c.distance(a);
         return (A + B > C && B + C > A && C + A > B);
     }
     
-    private boolean isPointInTriangle(Point2d point, Point2d a, Point2d b, Point2d c) {
+    private boolean isPointInTriangle(Point2D.Double point, Point2D.Double a, Point2D.Double b, Point2D.Double c) {
         boolean b1, b2, b3;
 
         b1 = sign(point, a, b) < 0.0f;
@@ -119,7 +118,7 @@ public class BarycentricInterpolation {
         return ((b1 == b2) && (b2 == b3));
     }
     
-    private double sign(Point2d a, Point2d b, Point2d c) {
+    private double sign(Point2D.Double a, Point2D.Double b, Point2D.Double c) {
         return (a.x - c.x) * (b.y - c.y) - (b.x - c.x) * (a.y - c.y);
     }
     
@@ -130,7 +129,7 @@ public class BarycentricInterpolation {
      * @param c
      * @return
      */
-    private double triangleArea(Point2d a, Point2d b, Point2d c) {
+    private double triangleArea(Point2D.Double a, Point2D.Double b, Point2D.Double c) {
         return triangleArea(a.distance(b), b.distance(c), c.distance(a));
     }
     
@@ -158,10 +157,10 @@ public class BarycentricInterpolation {
      * @param c2
      * @return
      */
-    private Point2d barycentric(
-            Point2d p,
-            Point2d a1, Point2d b1, Point2d c1,
-            Point2d a2, Point2d b2, Point2d c2
+    private Point2D.Double barycentric(
+            Point2D.Double p,
+            Point2D.Double a1, Point2D.Double b1, Point2D.Double c1,
+            Point2D.Double a2, Point2D.Double b2, Point2D.Double c2
             ) {
         double A = triangleArea(a1, b1, c1);
         double A1 = triangleArea(p, b1, c1);
@@ -169,15 +168,15 @@ public class BarycentricInterpolation {
         double A3 = triangleArea(p, a1, b1);
         double x = ((A1 * a2.x) + (A2 * b2.x) + (A3 * c2.x)) / A;
         double y = ((A1 * a2.y) + (A2 * b2.y) + (A3 * c2.y)) / A;
-        return new Point2d(x, y);
+        return new Point2D.Double(x, y);
     }
     
     public static void main(String[] args) throws Exception {
         BarycentricInterpolation interp = new BarycentricInterpolation(new FileReader(new File("/Users/jason/.openpnp-fpd-hax/gfilter.json")));
-        System.out.println(interp.interpolate(new Point2d(0.2, 0.2)));
-        System.out.println(interp.interpolate(new Point2d(-0.3, 0.3)));
-        System.out.println(interp.interpolate(new Point2d(-0.1, -0.1)));
-        System.out.println(interp.interpolate(new Point2d(0.4, -0.4)));
+        System.out.println(interp.interpolate(new Point2D.Double(0.2, 0.2)));
+        System.out.println(interp.interpolate(new Point2D.Double(-0.3, 0.3)));
+        System.out.println(interp.interpolate(new Point2D.Double(-0.1, -0.1)));
+        System.out.println(interp.interpolate(new Point2D.Double(0.4, -0.4)));
         System.out.println(interp.interpolate(new Location(LengthUnit.Millimeters, 10, 20, 30, 40)));
         System.out.println(interp.interpolate(new Location(LengthUnit.Millimeters, 0, 0, 0, 0)));
     }
