@@ -6,6 +6,7 @@ import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.HashMap;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -114,6 +115,11 @@ public class JobPlacementsPanel extends JPanel {
         JButton btnEditFeeder = new JButton(editPlacementFeederAction);
         btnEditFeeder.setHideActionText(true);
         toolBarPlacements.add(btnEditFeeder);
+        
+                
+        toolBarPlacements.addSeparator();
+        toolBarPlacements.add(captureGilterLocation);
+        toolBarPlacements.add(dumpGilterLocations);
 
         placementsTableModel = new PlacementsTableModel(configuration);
 
@@ -403,6 +409,38 @@ public class JobPlacementsPanel extends JPanel {
                 }
             }
             MainFrame.feedersPanel.showFeeder(feeder);
+        }
+    };
+    
+    HashMap<String, Location[]> gfilterLocations = new HashMap<>();
+    public final Action captureGilterLocation = new AbstractAction("Capture Gfilter") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            Location placementLocation = 
+                    Utils2D.calculateBoardPlacementLocation(
+                            boardLocation.getLocation(),
+                            boardLocation.getSide(),
+                            getSelectedPlacement().getLocation());
+            Location location = MainFrame.mainFrame.cameraPanel.getSelectedCameraLocation();
+            System.out.println(placementLocation + " -> " + location);
+            gfilterLocations.put(getSelectedPlacement().getId(), new Location[] { placementLocation, location });
+        }
+    };
+    
+    public final Action dumpGilterLocations = new AbstractAction("Dump Gfilter") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            for (String placementId : gfilterLocations.keySet()) {
+                Location[] locations = gfilterLocations.get(placementId);
+                Location placementLocation = locations[0];
+                Location location = locations[1];
+                System.out.println(String.format("%s\t%f\t%f\t%f\t%f",
+                        placementId,
+                        placementLocation.getX(),
+                        placementLocation.getY(),
+                        location.getX(),
+                        location.getY()));
+            }
         }
     };
 
