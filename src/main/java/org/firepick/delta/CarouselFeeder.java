@@ -2,6 +2,7 @@ package org.firepick.delta;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -122,7 +123,7 @@ public class CarouselFeeder extends ReferenceFeeder {
         if (filtered.size() < 1) {
             throw new Exception("No rectangle matches found.");
         }
-        filtered.sort(new Comparator<RotatedRect>() {
+        Collections.sort(filtered, new Comparator<RotatedRect>() {
             @Override
             public int compare(RotatedRect o1, RotatedRect o2) {
                 Location origin = new Location(LengthUnit.Millimeters);

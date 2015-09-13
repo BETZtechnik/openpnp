@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -76,7 +77,7 @@ public class BarycentricInterpolation {
     private Point2D.Double interpolate(final Point2D.Double point) {
         // find the three nearest points to the given point
         List<Point2D.Double> sorted = new ArrayList<>(map.keySet());
-        sorted.sort(new Comparator<Point2D.Double>() {
+        Collections.sort(sorted, new Comparator<Point2D.Double>() {
             @Override
             public int compare(Point2D.Double o1, Point2D.Double o2) {
                 return Double.compare(point.distance(o1), point.distance(o2));
