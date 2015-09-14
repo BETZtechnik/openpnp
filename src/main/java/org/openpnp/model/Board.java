@@ -61,6 +61,10 @@ public class Board extends AbstractModelObject implements PropertyChangeListener
     @ElementList(required=false)
     private ArrayList<Pad> solderPastePads = new ArrayList<>();
     
+    // model based on http://www.compuphase.com/electronics/reflowsolderprofiles.htm
+    @ElementList(required=false)
+    private ArrayList<ReflowProfileStep> reflowProfile = new ArrayList<>();
+    
 	private transient File file;
 	private transient boolean dirty;
 	
@@ -83,12 +87,14 @@ public class Board extends AbstractModelObject implements PropertyChangeListener
         for (Pad pad : solderPastePads) {
             pad.addPropertyChangeListener(this);
         }
+        for (ReflowProfileStep step : reflowProfile) {
+            step.addPropertyChangeListener(this);
+        }
 	}
 	
 	public List<Fiducial> getFiducials() {
 		return Collections.unmodifiableList(fiducials);
 	}
-	
 	
 	public void addFiducial(Fiducial fiducial) {
 		ArrayList<Fiducial> oldValue = fiducials;
@@ -152,7 +158,30 @@ public class Board extends AbstractModelObject implements PropertyChangeListener
         }
     }
     
-	
+    public List<ReflowProfileStep> getReflowProfile() {
+        return Collections.unmodifiableList(reflowProfile);
+    }
+    
+    public void addReflowProfileStep(ReflowProfileStep reflowProfileStep) {
+        Object oldValue = reflowProfile;
+        reflowProfile = new ArrayList<ReflowProfileStep>(reflowProfile);
+        reflowProfile.add(reflowProfileStep);
+        firePropertyChange("reflowProfile", oldValue, reflowProfile);
+        if (reflowProfileStep != null) {
+            reflowProfileStep.addPropertyChangeListener(this); 
+        }
+    }
+    
+    public void removeReflowProfileStep(ReflowProfileStep reflowProfileStep) {
+        Object oldValue = reflowProfile;
+        reflowProfile = new ArrayList<ReflowProfileStep>(reflowProfile);
+        reflowProfile.remove(reflowProfileStep);
+        firePropertyChange("reflowProfile", oldValue, reflowProfile);
+        if (reflowProfileStep != null) {
+            reflowProfileStep.removePropertyChangeListener(this);
+        }
+    }
+    
 	public Outline getOutline() {
 		return outline;
 	}

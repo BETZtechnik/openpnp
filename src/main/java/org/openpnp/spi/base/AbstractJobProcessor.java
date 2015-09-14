@@ -12,6 +12,7 @@ import org.openpnp.model.BoardLocation;
 import org.openpnp.model.Job;
 import org.openpnp.model.Part;
 import org.openpnp.model.Placement;
+import org.openpnp.model.ReflowProfileStep;
 import org.openpnp.spi.Feeder;
 import org.openpnp.spi.JobProcessor;
 import org.openpnp.spi.PropertySheetHolder;
@@ -206,6 +207,18 @@ public abstract class AbstractJobProcessor implements JobProcessor, Runnable {
         logger.debug("fireDetailedStatusUpdated({})", status);
         for (JobProcessorListener listener : listeners) {
             listener.detailedStatusUpdated(status);
+        }
+    }
+    
+    protected void fireReflowProgress(
+            ReflowProfileStep step,
+            double currentTemperatureCelsius, 
+            int currentHoldSeconds) {
+        for (JobProcessorListener listener : listeners) {
+            listener.reflowProgress(
+                    step, 
+                    currentTemperatureCelsius, 
+                    currentHoldSeconds);
         }
     }
     

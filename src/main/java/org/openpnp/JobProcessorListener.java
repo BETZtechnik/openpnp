@@ -24,6 +24,7 @@ package org.openpnp;
 import org.openpnp.model.BoardLocation;
 import org.openpnp.model.Job;
 import org.openpnp.model.Placement;
+import org.openpnp.model.ReflowProfileStep;
 import org.openpnp.spi.JobProcessor.JobError;
 import org.openpnp.spi.JobProcessor.JobState;
 
@@ -77,6 +78,11 @@ public interface JobProcessorListener {
 	 */
 	public void partProcessingCompleted(BoardLocation board, Placement placement);
 	
+	public void reflowProgress(
+	        ReflowProfileStep step,
+	        double currentTemperatureCelsius, 
+	        int currentHoldSeconds);
+	
 	// TODO Maybe partProcessingFailed with a reason
 	
 	// TODO Add job progress information, especially after pre-processing
@@ -124,5 +130,10 @@ public interface JobProcessorListener {
 		@Override
 		public void detailedStatusUpdated(String status) {
 		}
+
+        @Override
+        public void reflowProgress(ReflowProfileStep step,
+                double currentTemperatureCelsius, int currentHoldSeconds) {
+        }
 	}
 }

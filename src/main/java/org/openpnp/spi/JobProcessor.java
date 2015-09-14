@@ -30,7 +30,8 @@ public interface JobProcessor extends WizardConfigurable, PropertySheetHolder {
     
     public enum Type {
         PickAndPlace,
-        SolderPaste
+        SolderPaste,
+        Reflow
     }
     
     public abstract void setDelegate(JobProcessorDelegate delegate);
