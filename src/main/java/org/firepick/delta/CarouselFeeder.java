@@ -89,8 +89,8 @@ public class CarouselFeeder extends ReferenceFeeder {
             bestMatch.angle = Math.abs(bestMatch.angle);
             Location l = VisionUtils.getPixelCenterOffsets(
                     camera, 
-                    (int) bestMatch.center.x, 
-                    (int) bestMatch.center.y);
+                    bestMatch.center.x, 
+                    bestMatch.center.y);
             l = camera.getLocation().subtract(l);
             l = l.derive(null, null, null, bestMatch.angle);
             camera.moveTo(l, 1.0);
