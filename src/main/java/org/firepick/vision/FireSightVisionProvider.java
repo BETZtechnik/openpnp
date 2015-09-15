@@ -32,6 +32,7 @@ import org.openpnp.model.Location;
 import org.openpnp.model.Part;
 import org.openpnp.spi.Camera.Looking;
 import org.openpnp.spi.Nozzle;
+import org.openpnp.util.MovableUtils;
 import org.openpnp.util.VisionUtils;
 
 public class FireSightVisionProvider extends OpenCvVisionProvider {
@@ -42,15 +43,17 @@ public class FireSightVisionProvider extends OpenCvVisionProvider {
             throw new Exception("Bottom vision only implemented for Up looking cameras");
         }
 
-        // Position the part above the center of the camera.
-        // First move to Safe-Z.
-        nozzle.moveToSafeZ(1.0);
-        // Then move to the camera in X, Y at Safe-Z and rotate the
-        // part to 0.
-        nozzle.moveTo(camera.getLocation().derive(null, null, Double.NaN, 0.0), 1.0);
-        // Then lower the part to the Camera's focal point in Z. Maintain the 
-        // part's rotation at 0.
-        nozzle.moveTo(camera.getLocation().derive(null, null, null, Double.NaN), 1.0);
+        // Create a location that is the Camera's X, Y, it's Z + part height
+        // and a rotation of 0.
+        Location startLocation = camera.getLocation();
+        double partHeight = part.getHeight().convertToUnits(startLocation.getUnits()).getValue();
+        startLocation = startLocation.derive(
+                null, 
+                null, 
+                startLocation.getZ() + partHeight, 
+                0d);
+
+        MovableUtils.moveToLocationAtSafeZ(nozzle, startLocation, 1.0);
         
         for (int i = 0; i < 3; i++) {
             // Settle
@@ -95,9 +98,6 @@ public class FireSightVisionProvider extends OpenCvVisionProvider {
             
             nozzle.moveTo(location, 1.0);
         }
-        
-        // Chill a tick to show off our work.
-        Thread.sleep(2500);
         
         Location offsets = camera.getLocation().subtractWithRotation(nozzle.getLocation());
 
