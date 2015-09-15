@@ -69,7 +69,21 @@ public class FireSightVisionProvider extends OpenCvVisionProvider {
                     camera,
                     rect.center.x, 
                     rect.center.y);
-            offsets = offsets.derive(null, null, null, rect.angle);
+
+            // We assume that the part is never picked more than 45º rotated
+            // so if OpenCV tells us it's rotated more than 45º we correct
+            // it. This seems to happen quite a bit when the angle of rotation
+            // is close to 0.
+            double angle = rect.angle;
+            if (Math.abs(angle) > 45) {
+                if (angle < 0) {
+                    angle += 90;
+                }
+                else {
+                    angle -= 90;
+                }
+            }
+            offsets = offsets.derive(null, null, null, angle);
 
             // Invert Y, since our camera is upside down. Figure out how to handle this in config.
             offsets = offsets.multiply(1, -1, 1, 1);
