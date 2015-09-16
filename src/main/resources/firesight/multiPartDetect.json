@@ -1,0 +1,10 @@
+[
+  {"op":"cvtColor", "code":"CV_BGR2GRAY"},
+  {"op":"blur","ksize.width":3, "ksize.height":3},
+  {"op":"threshold","thresh":50.0},
+  {"op":"Canny","threshold1":1,"threshold2":100,"apertureSize":3,"L2gradient":false},
+  {"op":"detectParts", "name":"multi"},
+  {"op":"rectFilter", "model":"multi", "name":"filtered", "max_width":100, "max_height":100, "min_width":10, "min_height":10},
+  {"op":"drawRects", "model":"filtered", "thickness":1}
+]
+

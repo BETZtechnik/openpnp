@@ -1,0 +1,10 @@
+[
+  {
+    "name": "s1",
+    "op": "HoughCircles",
+    "houghcircles_minDist": 100.0,
+    "show": true,
+    "diamMin": 85.0,
+    "diamMax": 95.0
+  }
+]

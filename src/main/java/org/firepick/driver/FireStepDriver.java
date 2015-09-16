@@ -41,14 +41,14 @@ import java.util.concurrent.TimeoutException;
 
 import javax.swing.Action;
 
-import org.firepick.delta.CarouselFeeder;
-import org.firepick.delta.FireSight;
-import org.firepick.delta.FireSight.FireSightResult;
 import org.firepick.driver.wizards.FireStepDriverWizard;
+import org.firepick.feeder.CarouselFeeder;
 import org.firepick.gfilter.GCoordinate;
 import org.firepick.gfilter.MappedPointFilter;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
 import org.firepick.model.RawStepTriplet;
+import org.firepick.vision.FireSight;
+import org.firepick.vision.FireSight.FireSightResult;
 import org.openpnp.ConfigurationListener;
 import org.openpnp.gui.MainFrame;
 import org.openpnp.gui.support.PropertySheetWizardAdapter;
@@ -62,11 +62,12 @@ import org.openpnp.machine.reference.ReferenceNozzle;
 import org.openpnp.machine.reference.ReferencePasteDispenser;
 import org.openpnp.machine.reference.driver.AbstractSerialPortDriver;
 import org.openpnp.model.Configuration;
-import org.openpnp.model.Length;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
 import org.openpnp.spi.Camera;
+import org.openpnp.spi.Nozzle;
 import org.openpnp.spi.PropertySheetHolder;
+import org.openpnp.util.MovableUtils;
 import org.openpnp.util.VisionUtils;
 import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.Element;
@@ -122,6 +123,11 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Attribute(required=false)
 	private long dispenseTimeMilliseconds = 400;
 	
+	/*
+	 * Stores whether or not the machine has been homed. If it has been homed
+	 * and we are disabling the machine, before homing again we move to zero
+	 * at Safe-Z so we don't hit the machine extents.
+	 */
 	private boolean homed = false;
 	
 	public FireStepDriver() {
@@ -204,6 +210,19 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    		enableUpLookingRingLight(false);   		// Turn off up-looking LED ring light
 	    		if (powerSupplyOn)
 	    		{
+	    		    if (homed) {
+	    		        Nozzle nozzle = Configuration
+	    		                .get()
+	    		                .getMachine()
+	    		                .getHeads()
+	    		                .get(0)
+	    		                .getNozzles()
+	    		                .get(0);
+	    		        MovableUtils.moveToLocationAtSafeZ(
+	    		                nozzle, 
+	    		                new Location(LengthUnit.Millimeters, 0, 0, 0, 0), 
+	    		                1.0);
+	    		    }
 			        home(null);                        	// home the machine
                     enableVacuumPump(false);            // Turn the vacuum pump OFF
                     enableDispenser(false);
@@ -211,6 +230,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 			        enablePowerSupply(false);          	// Turn off the power supply
 	    		}
 	    	}
+	    	homed = false;
 	    }
 	}
 	
@@ -723,7 +743,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
     private Location findCircle(Camera camera) throws Exception {
         Thread.sleep(1000);
         BufferedImage image = camera.capture();
-        FireSightResult result = FireSight.fireSight(image, "calibration-hough.json");
+        FireSightResult result = FireSight.fireSight(image, "firesight/calibration-hough.json");
         return getClosestCircleLocation(result.model, camera);
     }
     

@@ -1,4 +1,4 @@
-package org.firepick.delta;
+package org.firepick.feeder;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -8,10 +8,11 @@ import java.util.List;
 
 import javax.swing.Action;
 
-import org.firepick.delta.FireSight.FireSightResult;
 import org.firepick.driver.CarouselDriver;
 import org.firepick.driver.FireStepDriver;
 import org.firepick.driver.wizards.CarouselFeederWizard;
+import org.firepick.vision.FireSight;
+import org.firepick.vision.FireSight.FireSightResult;
 import org.opencv.core.RotatedRect;
 import org.opencv.core.Size;
 import org.openpnp.gui.support.PropertySheetWizardAdapter;
@@ -73,7 +74,7 @@ public class CarouselFeeder extends ReferenceFeeder {
         for (int i = 0; i < 3; i++) {
             Thread.sleep(500);
             BufferedImage image = camera.capture();
-            FireSightResult result = FireSight.fireSight(image, "multiPartDetect.json");
+            FireSightResult result = FireSight.fireSight(image, "firesight/multiPartDetect.json");
             List<RotatedRect> rects = FireSight
                     .parseRotatedRects(result.model.get("filtered")
                             .getAsJsonObject().get("rects").getAsJsonArray());

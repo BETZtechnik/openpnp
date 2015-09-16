@@ -1,18 +1,21 @@
-package org.firepick.delta;
+package org.firepick.vision;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.InputStreamReader;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.imageio.ImageIO;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.opencv.core.Point;
 import org.opencv.core.RotatedRect;
 import org.opencv.core.Size;
 import org.openpnp.model.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -21,6 +24,9 @@ import com.google.gson.JsonParser;
 
 
 public class FireSight {
+    private static final Logger logger = LoggerFactory
+            .getLogger(FireSight.class);
+    
     /**
      * Run FireSight against the input image using a pipeline defined in a
      * configuration file called pipelineName. The pipeline file is expected
@@ -32,16 +38,17 @@ public class FireSight {
      * @throws Exception
      */
     public static FireSightResult fireSight(BufferedImage input, String pipelineName) throws Exception {
-        File sourceFile = Configuration.get().createResourceFile(FireSight.class, "fs-i", ".png");
+        File sourceFile = File.createTempFile("fsi", ".png");
         ImageIO.write(input, "png", sourceFile);
         
         // load the FireSight pipeline
-        File pipeline = new File(
-                new File(Configuration.get().getConfigurationDirectory(), "firesight"), 
-                pipelineName);
+        File pipelineFile = File.createTempFile("fsp", ".json");
+        FileOutputStream pipelineOut = new FileOutputStream(pipelineFile);
+        IOUtils.copy(ClassLoader.getSystemResourceAsStream(pipelineName), pipelineOut);
+        pipelineOut.close();
         
         // create a place to store the output image
-        File outputFile = Configuration.get().createResourceFile(FireSight.class, "fs-o", ".png");
+        File outputFile = File.createTempFile("fso", ".png");
         
         // run FireSight
         ProcessBuilder pb = new ProcessBuilder(
@@ -49,7 +56,7 @@ public class FireSight {
                 "-i",
                 sourceFile.getAbsolutePath(),
                 "-p",
-                pipeline.getAbsolutePath(),
+                pipelineFile.getAbsolutePath(),
                 "-o",
                 outputFile.getAbsolutePath());
         Process process = pb.start();
@@ -59,9 +66,24 @@ public class FireSight {
         if (ret != 0) {
             throw new Exception("FireSight execution failed:\n" + pErr);
         }
+        
+        if (logger.isDebugEnabled()) {
+            // log the firesight results
+            copyFileToLogDirectory(sourceFile, "fsi", ".png");
+            copyFileToLogDirectory(pipelineFile, "fsp", ".json");
+            copyFileToLogDirectory(outputFile, "fso", ".png");
+            File output = Configuration.get().createResourceFile(FireSight.class, "fsr", ".json");
+            FileUtils.write(output, pOut);
+        }
+        
         JsonObject results = (JsonObject) new JsonParser().parse(pOut);
         BufferedImage output = ImageIO.read(outputFile);
         return new FireSightResult(results, output);
+    }
+    
+    private static void copyFileToLogDirectory(File file, String prefix, String suffix) throws Exception {
+        File output = Configuration.get().createResourceFile(FireSight.class, prefix, suffix);
+        FileUtils.copyFile(file, output);
     }
     
     public static List<RotatedRect> parseRotatedRects(JsonArray a) {

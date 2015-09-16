@@ -24,8 +24,7 @@ package org.firepick.vision;
 import java.awt.image.BufferedImage;
 import java.util.List;
 
-import org.firepick.delta.FireSight;
-import org.firepick.delta.FireSight.FireSightResult;
+import org.firepick.vision.FireSight.FireSightResult;
 import org.opencv.core.RotatedRect;
 import org.openpnp.machine.reference.vision.OpenCvVisionProvider;
 import org.openpnp.model.Location;
@@ -57,12 +56,12 @@ public class FireSightVisionProvider extends OpenCvVisionProvider {
         
         for (int i = 0; i < 3; i++) {
             // Settle
-            Thread.sleep(750);
+            Thread.sleep(500);
             // Grab an image.
             BufferedImage image = camera.capture();
             
             // perform the vision op
-            FireSightResult result = FireSight.fireSight(image, "bottomVision.json");
+            FireSightResult result = FireSight.fireSight(image, "firesight/bottomVision.json");
             List<RotatedRect> rects = FireSight.parseRotatedRects(
                     result.model.get("minAreaRect").getAsJsonObject().get("rects").getAsJsonArray());
             RotatedRect rect = rects.get(0);

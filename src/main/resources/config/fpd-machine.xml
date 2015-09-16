@@ -1,0 +1,85 @@
+<openpnp-machine>
+   <machine class="org.openpnp.machine.reference.ReferenceMachine">
+      <heads>
+         <head class="org.firepick.delta.FpdHead" id="22964dce-252a-453e-8106-65db104a0763" name="H1">
+            <nozzles>
+               <nozzle class="org.openpnp.machine.reference.ReferenceNozzle" id="69edd567-df6c-495a-9b30-2fcbf5c9742f" name="N1" pick-dwell-milliseconds="0" place-dwell-milliseconds="0" current-nozzle-tip-id="e092921a-2eef-449b-b340-aa3f40d8d791" changer-enabled="false" safe-z="20.0" limit-rotation="false">
+                  <nozzle-tips>
+                     <nozzle-tip class="org.openpnp.machine.reference.ReferenceNozzleTip" id="e092921a-2eef-449b-b340-aa3f40d8d791" name="NT1" allow-incompatible-packages="true">
+                        <compatible-package-ids class="java.util.HashSet"/>
+                        <changer-start-location units="Millimeters" x="0.0" y="0.0" z="0.0" rotation="0.0"/>
+                        <changer-mid-location units="Millimeters" x="0.0" y="0.0" z="0.0" rotation="0.0"/>
+                        <changer-end-location units="Millimeters" x="0.0" y="0.0" z="0.0" rotation="0.0"/>
+                     </nozzle-tip>
+                  </nozzle-tips>
+                  <head-offsets units="Millimeters" x="0.0" y="0.0" z="0.0" rotation="0.0"/>
+               </nozzle>
+            </nozzles>
+            <actuators>
+               <actuator class="org.openpnp.machine.reference.ReferenceActuator" id="5b8a8cbd-d6c1-4324-af8b-eba5f0444622" name="A1" index="0" safe-z="20.0">
+                  <head-offsets units="Millimeters" x="0.0" y="0.0" z="0.0" rotation="0.0"/>
+               </actuator>
+            </actuators>
+            <cameras>
+               <camera class="org.openpnp.machine.reference.camera.OpenCvCamera" id="fac961fb-7376-49c7-b6df-388fa11177db" name="Down" looking="Down" rotation="93.5" safe-z="20.0" device-index="2">
+                  <units-per-pixel units="Millimeters" x="0.029" y="0.029" z="0.0" rotation="0.0"/>
+                  <vision-provider class="org.firepick.vision.FireSightVisionProvider"/>
+                  <head-offsets units="Millimeters" x="0.71" y="-28.63" z="-20.0" rotation="0.0"/>
+               </camera>
+            </cameras>
+            <paste-dispensers>
+               <paste-dispenser class="org.openpnp.machine.reference.ReferencePasteDispenser" id="53050ccf-59a0-4d9f-a8d3-6216f5412e4e" name="D1" safe-z="20.0">
+                  <head-offsets units="Millimeters" x="0.0" y="0.0" z="0.0" rotation="0.0"/>
+               </paste-dispenser>
+            </paste-dispensers>
+         </head>
+      </heads>
+      <feeders>
+         <feeder class="org.firepick.feeder.CarouselFeeder" id="e277e4f5-2df2-4c3d-83e7-7da21c3692cc" name="CAR-01" enabled="false" part-id="TESTPKG-R0805-TESTPKG-RESISTOR0805" address="0" tray="0" part-vision-width="60.0" part-vision-height="48.0">
+            <location units="Millimeters" x="-135.485" y="-3.232" z="-13.137" rotation="0.0"/>
+         </feeder>
+         <feeder class="org.firepick.feeder.CarouselFeeder" id="00fe8a28-4db3-4a23-8f69-ea74a74678b8" name="CAR-02" enabled="false" part-id="R0805-30K-2" address="0" tray="1" part-vision-width="60.0" part-vision-height="48.0">
+            <location units="Millimeters" x="-135.485" y="-3.232" z="-13.137" rotation="0.0"/>
+         </feeder>
+         <feeder class="org.firepick.feeder.CarouselFeeder" id="92777271-4180-403d-b4bb-dbad6cfad59a" name="CAR-03" enabled="false" part-id="R0805-30K-3" address="0" tray="2" part-vision-width="60.0" part-vision-height="48.0">
+            <location units="Millimeters" x="-135.485" y="-3.232" z="-13.137" rotation="0.0"/>
+         </feeder>
+         <feeder class="org.openpnp.machine.reference.feeder.ReferenceStripFeeder" id="94e08af7-da6e-4753-a4dc-5c1e2ad33d7e" name="ReferenceStripFeeder" enabled="true" part-id="WS2812B-WS2812B" tape-type="BlackPlastic" feed-count="12">
+            <location units="Millimeters" x="0.0" y="0.0" z="0.0" rotation="0.0"/>
+            <reference-hole-location units="Millimeters" x="126.59" y="-55.12" z="-21.9" rotation="0.0"/>
+            <last-hole-location units="Millimeters" x="126.19" y="44.48" z="-21.9" rotation="0.0"/>
+            <part-pitch value="8.0" units="Millimeters"/>
+            <tape-width value="12.0" units="Millimeters"/>
+         </feeder>
+      </feeders>
+      <cameras>
+         <camera class="org.openpnp.machine.reference.camera.OpenCvCamera" id="2c96bd2f-2c20-491c-8864-e79bf4f9aa8b" name="Up" looking="Up" rotation="179.8" safe-z="0.0" device-index="0">
+            <units-per-pixel units="Millimeters" x="0.017" y="0.018" z="0.0" rotation="0.0"/>
+            <vision-provider class="org.firepick.vision.FireSightVisionProvider"/>
+            <head-offsets units="Millimeters" x="1.655" y="-140.012" z="3.463" rotation="0.0"/>
+         </camera>
+      </cameras>
+      <job-processors class="java.util.HashMap">
+         <job-processor type="PickAndPlace">
+            <job-processor class="org.openpnp.machine.reference.ReferenceJobProcessor" demo-mode="false">
+               <job-planner class="org.openpnp.planner.SimpleJobPlanner"/>
+            </job-processor>
+         </job-processor>
+         <job-processor type="SolderPaste">
+            <job-processor class="org.openpnp.machine.reference.ReferenceSolderPasteJobProcessor"/>
+         </job-processor>
+      </job-processors>
+      <driver class="org.firepick.driver.FireStepDriver" port-name="/dev/tty.usbmodem1d1141" baud="19200" use-gfilter="false" use-barycentric="true" dispense-time-milliseconds="400">
+         <use-pwm-vacuum>false</use-pwm-vacuum>
+         <pwm-vacuum-setting>50</pwm-vacuum-setting>
+         <delta-calculator e="131.636" f="190.526" r-e="268.0" r-f="90.0" delta-zoffset="268.0" delta-ee-offset="15.0" tool-offset="30.5" home-angle-steps-x="-5440" home-angle-steps-y="-5439" home-angle-steps-z="-5503" steps-per-motor-rotation="200.0" motor-microsteps="16.0" pulley-reduction-x="9.463324361" pulley-reduction-y="9.488866397" pulley-reduction-z="9.428427757">
+            <steps-to-angle-mappings class="java.util.ArrayList"/>
+         </delta-calculator>
+         <carousel-drivers class="java.util.ArrayList">
+            <carousel-driver address="0">
+               <home-location units="Millimeters" x="-109.485" y="-2.232" z="20.0" rotation="0.0"/>
+            </carousel-driver>
+         </carousel-drivers>
+      </driver>
+   </machine>
+</openpnp-machine>
