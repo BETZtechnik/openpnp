@@ -210,19 +210,6 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    		enableUpLookingRingLight(false);   		// Turn off up-looking LED ring light
 	    		if (powerSupplyOn)
 	    		{
-	    		    if (homed) {
-	    		        Nozzle nozzle = Configuration
-	    		                .get()
-	    		                .getMachine()
-	    		                .getHeads()
-	    		                .get(0)
-	    		                .getNozzles()
-	    		                .get(0);
-	    		        MovableUtils.moveToLocationAtSafeZ(
-	    		                nozzle, 
-	    		                new Location(LengthUnit.Millimeters, 0, 0, 0, 0), 
-	    		                1.0);
-	    		    }
 			        home(null);                        	// home the machine
                     enableVacuumPump(false);            // Turn the vacuum pump OFF
                     enableDispenser(false);
@@ -253,10 +240,28 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 
     @Override
 	public void home(ReferenceHead head) throws Exception {
-//	    Nozzle nozzle = head.getNozzles().get(0);
-//	    if (homed && nozzle.getLocation().getLinearDistanceTo(0, 0) > 90) {
-//	        nozzle.moveTo(new Location(LengthUnit.Millimeters, 0, 0, 0, 0), 1.0);
-//	    }
+        if (homed) {
+            Nozzle nozzle;
+            if (head == null) {
+                nozzle = Configuration
+                    .get()
+                    .getMachine()
+                    .getHeads()
+                    .get(0)
+                    .getNozzles()
+                    .get(0);
+            }
+            else {
+                nozzle = head.getNozzles().get(0);
+            }
+            if (nozzle.getLocation().getLinearDistanceTo(0, 0) > 90) {
+                MovableUtils.moveToLocationAtSafeZ(
+                        nozzle, 
+                        new Location(LengthUnit.Millimeters, 0, 0, 0, 0), 
+                        1.0);
+            }
+        }
+        
         RawStepTriplet rs = deltaCalculator.getHomeRawSteps();
         sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
         setLocation(getFireStepLocation());
@@ -414,6 +419,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	public void place(ReferenceNozzle nozzle) throws Exception {
 		enableVacuumPump(false);
 		setRotMotorEnable(false);
+        enableDispenser(true);
+        Thread.sleep(1000);
+        enableDispenser(false);
 	}
 	
 	public synchronized void connect()
