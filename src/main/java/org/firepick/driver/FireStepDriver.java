@@ -846,16 +846,10 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                             System.out.println("False positive");
                             return;
                         }
-                        Location offsets = visionLocation.subtract(camera.getLocation());
-                        // Invert Y, since our camera is upside down. Figure out how to handle this in config.
-                        offsets = offsets.multiply(1, -1, 1, 1);
-                        System.out.println(offsets);
+                        Location offsets = camera.getLocation().subtract(visionLocation);
                         location = location.add(offsets);
                     }
-                    Location offsets = location.subtract(camera.getLocation());
-                    offsets = offsets.multiply(-1, -1, 1, 1);
-                    System.out.println("Final offsets " + offsets);
-                    System.out.println("head offsets " + hm.getHeadOffsets());
+                    Location offsets = camera.getLocation().subtract(location);
                     hm.setHeadOffsets(hm.getHeadOffsets().add(offsets));
                     MovableUtils.moveToLocationAtSafeZ(hm, camera.getLocation(), 1.0);
                     
