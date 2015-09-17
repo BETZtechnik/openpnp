@@ -2,7 +2,7 @@ package org.firepick.vision;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,25 +27,33 @@ public class FireSight {
     private static final Logger logger = LoggerFactory
             .getLogger(FireSight.class);
     
+    public static FireSightResult fireSight(BufferedImage input, JsonArray pipeline) throws Exception {
+        File pipelineFile = File.createTempFile("fsp", ".json");
+        FileUtils.write(pipelineFile, pipeline.toString());
+        return fireSight(input, pipelineFile);
+    }
+    
+    public static FireSightResult fireSight(BufferedImage input, String pipelineResourceName) throws Exception {
+        return fireSight(input, ClassLoader.getSystemResourceAsStream(pipelineResourceName));
+    }
+
+    public static FireSightResult fireSight(BufferedImage input, InputStream pipeline) throws Exception {
+        File pipelineFile = File.createTempFile("fsp", ".json");
+        FileUtils.copyInputStreamToFile(pipeline, pipelineFile);
+        return fireSight(input, pipelineFile);
+    }
+    
     /**
      * Run FireSight against the input image using a pipeline defined in a
-     * configuration file called pipelineName. The pipeline file is expected
-     * to be found in OpenPnP's configuration directory under a subdirectory
-     * called firesight.
+     * classpath resource called pipelineResourceName.
      * @param input
-     * @param pipelineName
+     * @param pipelineResourceName
      * @return
      * @throws Exception
      */
-    public static FireSightResult fireSight(BufferedImage input, String pipelineName) throws Exception {
+    public static FireSightResult fireSight(BufferedImage input, File pipelineFile) throws Exception {
         File sourceFile = File.createTempFile("fsi", ".png");
         ImageIO.write(input, "png", sourceFile);
-        
-        // load the FireSight pipeline
-        File pipelineFile = File.createTempFile("fsp", ".json");
-        FileOutputStream pipelineOut = new FileOutputStream(pipelineFile);
-        IOUtils.copy(ClassLoader.getSystemResourceAsStream(pipelineName), pipelineOut);
-        pipelineOut.close();
         
         // create a place to store the output image
         File outputFile = File.createTempFile("fso", ".png");

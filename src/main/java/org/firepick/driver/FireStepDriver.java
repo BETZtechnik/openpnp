@@ -65,7 +65,11 @@ import org.openpnp.model.Configuration;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
 import org.openpnp.spi.Camera;
+import org.openpnp.spi.Head;
+import org.openpnp.spi.HeadMountable;
+import org.openpnp.spi.Machine;
 import org.openpnp.spi.Nozzle;
+import org.openpnp.spi.PasteDispenser;
 import org.openpnp.spi.PropertySheetHolder;
 import org.openpnp.util.MovableUtils;
 import org.openpnp.util.VisionUtils;
@@ -675,8 +679,15 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                             // move to where we expect to find the circle
                             camera.moveTo(visionLocation, 1.0);
                             
+                            // wait a tick
+                            Thread.sleep(1000);
+                            
                             // find the circle
-                            Location visionLocation2 = findCircle(camera);
+                            List<Location> circles = findCircles(camera, 85, 95, 100);
+                            Location visionLocation2 = null;
+                            if (!circles.isEmpty()) {
+                                visionLocation2 = circles.get(0);
+                            }
                             
                             // if nothing found, loop and try again
                             if (visionLocation2 == null) {
@@ -738,29 +749,153 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
     }
     
     /**
-     * Find the closest circle of the specified diameter using the given
-     * camera. This function is tuned specifically for finding circles
-     * of 2.5mm on a 10mm x 10mm calibration grid.
-     * @param diameter
-     * @param camera
+     * Attempt to determine which tool is installed using the bottom
+     * vision camera.
      * @return
      * @throws Exception
      */
-    private Location findCircle(Camera camera) throws Exception {
+    public HeadMountable detectInstalledTool() throws Exception {
+        Machine machine = Configuration.get().getMachine();
+        Head head = machine.getHeads().get(0);
+        Camera camera = machine.getCameras().get(0);
+        Nozzle nozzle = head.getNozzles().get(0);
+        PasteDispenser dispenser = head.getPasteDispensers().get(0);
+
+        List<Location> locations;
+        
+        double nozzleRadius = 38.78037;
+        double dispenserRadius = 17.0709154;
+        
+        // the paste dispenser is longer, so try that one first so
+        // that we don't potentially collide it with the camera.
+        MovableUtils.moveToLocationAtSafeZ(dispenser, camera.getLocation(), 1.0);
         Thread.sleep(1000);
-        BufferedImage image = camera.capture();
-        FireSightResult result = FireSight.fireSight(image, "firesight/calibration-hough.json");
-        return getClosestCircleLocation(result.model, camera);
+        locations = findCircles(camera, dispenserRadius - 1, dispenserRadius + 1, 400);
+        Location dispenserLocation = null;
+        if (!locations.isEmpty()) {
+            Location location = locations.get(0);
+            if (location.getLinearDistanceTo(camera.getLocation()) < 10) {
+                dispenserLocation = location;
+            }
+        }
+        
+        // now try the nozzle
+        MovableUtils.moveToLocationAtSafeZ(nozzle, camera.getLocation(), 1.0);
+        Thread.sleep(1000);
+        locations = findCircles(camera, nozzleRadius - 1, nozzleRadius + 1, 400);
+        Location nozzleLocation = null;
+        if (!locations.isEmpty()) {
+            Location location = locations.get(0);
+            if (location.getLinearDistanceTo(camera.getLocation()) < 10) {
+                nozzleLocation = location;
+            }
+        }
+        
+        if (nozzleLocation == null && dispenserLocation == null) {
+            return null;
+        }
+        else if (nozzleLocation == null) {
+            return dispenser;
+        }
+        else if (dispenserLocation == null) {
+            return nozzle;
+        }
+        // if we got a hit for both then it's probably the nozzle because
+        // the nozzle's ID is the same as the dispenser's OD, so sometimes
+        // we get a dispenser hit on the nozzle.
+        return nozzle;
     }
     
-    private Location getClosestCircleLocation(JsonObject model, final Camera camera) {
+    /**
+     * @throws Exception
+     */
+    public void checkToolOffsets() throws Exception {
+        MainFrame.machineControlsPanel.submitMachineTask(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Machine machine = Configuration.get().getMachine();
+                    Head head = machine.getHeads().get(0);
+                    Camera camera = machine.getCameras().get(0);
+
+                    ReferenceHeadMountable hm = (ReferenceHeadMountable) detectInstalledTool();
+                    if (hm == null) {
+                        System.out.println("No tool installed");
+                    }
+                    System.out.println("Finding offsets for " + hm);
+                    double radius;
+                    double nozzleRadius = 38.78037;
+                    double dispenserRadius = 17.0709154;
+                    if (hm instanceof Nozzle) {
+                        radius = nozzleRadius;
+                    }
+                    else {
+                        radius = dispenserRadius;
+                    }
+                    Location location = camera.getLocation();
+                    for (int i = 0; i < 3; i++) {
+                        MovableUtils.moveToLocationAtSafeZ(hm, location, 1.0);
+                        Thread.sleep(1000);
+                        List<Location> locations = findCircles(camera, radius - 2, radius + 2, 400);
+                        if (locations.isEmpty()) {
+                            System.out.println("no matches found");
+                            return;
+                        }
+                        Location visionLocation = locations.get(0);
+                        if (visionLocation.getLinearDistanceTo(camera.getLocation()) > 10) {
+                            System.out.println("False positive");
+                            return;
+                        }
+                        Location offsets = visionLocation.subtract(camera.getLocation());
+                        // Invert Y, since our camera is upside down. Figure out how to handle this in config.
+                        offsets = offsets.multiply(1, -1, 1, 1);
+                        System.out.println(offsets);
+                        location = location.add(offsets);
+                    }
+                    Location offsets = location.subtract(camera.getLocation());
+                    offsets = offsets.multiply(-1, -1, 1, 1);
+                    System.out.println("Final offsets " + offsets);
+                    System.out.println("head offsets " + hm.getHeadOffsets());
+                    hm.setHeadOffsets(hm.getHeadOffsets().add(offsets));
+                    MovableUtils.moveToLocationAtSafeZ(hm, camera.getLocation(), 1.0);
+                    
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+    
+    /**
+     * Find circles in the camera view within the radius range. Circles are
+     * returned in order of closest to furthest from the center. Normal location
+     * objects are returned, except that the rotation field is set to the
+     * circle's radius.
+     * @param camera
+     * @param minRadius
+     * @param maxRadius
+     * @return
+     */
+    private List<Location> findCircles(final Camera camera, double minRadius, double maxRadius, double minDistance) throws Exception {
+        JsonArray pipeline = new JsonParser()
+            .parse("[{'name': 's1','op': 'HoughCircles','houghcircles_minDist': 400.0,'show': true,'diamMin': 10.0,'diamMax': 90.0}]")
+            .getAsJsonArray();
+        JsonObject s1 = pipeline.get(0).getAsJsonObject();
+        s1.addProperty("diamMin", minRadius * 2);
+        s1.addProperty("diamMax", maxRadius * 2);
+        BufferedImage image = camera.capture();
+        FireSightResult result = FireSight.fireSight(image, pipeline);
         List<Location> locations = new ArrayList<>();
-        for (JsonElement e : model.get("s1").getAsJsonObject().get("circles").getAsJsonArray()) {
-            JsonObject circle = e.getAsJsonObject();
-            double x = circle.get("x").getAsDouble();
-            double y = circle.get("y").getAsDouble();
-            Location offsets = VisionUtils.getPixelCenterOffsets(camera, (int) x, (int) y);
-            locations.add(camera.getLocation().subtract(offsets)); 
+        for (JsonElement e : result.model.get("s1").getAsJsonObject().get("circles").getAsJsonArray()) {
+            JsonObject o = e.getAsJsonObject();
+            double x = o.get("x").getAsDouble();
+            double y = o.get("y").getAsDouble();
+            double radius = o.get("radius").getAsDouble();
+            Location offsets = VisionUtils.getPixelCenterOffsets(camera, x, y);
+            Location location = camera.getLocation().subtract(offsets);
+            location = location.derive(null, null, null, radius);
+            locations.add(location); 
         }
         Collections.sort(locations, new Comparator<Location>() {
             public int compare(Location o1, Location o2) {
@@ -769,10 +904,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 return o1d.compareTo(o2d);
             }
         });
-        if (locations.isEmpty()) {
-            return null;
-        }
-        return locations.get(0);
+        return locations;
     }
     
     private void addDomainAndRange(JsonArray points, Location location, Location visionLocation) {

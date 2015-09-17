@@ -45,14 +45,15 @@ import org.openpnp.machine.reference.ReferenceHeadMountable;
 import org.openpnp.machine.reference.driver.wizards.AbstractSerialPortDriverConfigurationWizard;
 import org.openpnp.model.Configuration;
 import org.openpnp.model.Location;
+import org.openpnp.spi.HeadMountable;
 import org.openpnp.spi.Nozzle;
+import org.openpnp.spi.PasteDispenser;
 
 import com.google.gson.JsonObject;
 import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
-import java.awt.BorderLayout;
 
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
@@ -62,6 +63,15 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     public FireStepDriverWizard(FireStepDriver driver) {
         super(driver);
         this.driver = driver;
+        
+        JPanel panelTools = new JPanel();
+        contentPanel.add(panelTools);
+        
+        JButton btnDetectTool = new JButton(detectTool);
+        panelTools.add(btnDetectTool);
+        
+        JButton btnCheckOffsets = new JButton(checkToolOffsets);
+        panelTools.add(btnCheckOffsets);
         
         JPanel panelAngles = new JPanel();
         panelAngles.setBorder(new TitledBorder(null, "Angles", TitledBorder.LEADING, TitledBorder.TOP, null, null));
@@ -396,6 +406,33 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         public void actionPerformed(ActionEvent arg0) {
             try {
                 driver.generateGfilter();
+            }
+            catch (Exception e1){
+                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    };
+    
+    @SuppressWarnings("serial")
+    private Action detectTool = new AbstractAction("Detect Tool") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            try {
+                HeadMountable hm = driver.detectInstalledTool();
+                System.out.println(hm);
+            }
+            catch (Exception e1){
+                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    };
+    
+    @SuppressWarnings("serial")
+    private Action checkToolOffsets = new AbstractAction("Check Offsets") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            try {
+                driver.checkToolOffsets();
             }
             catch (Exception e1){
                 JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
