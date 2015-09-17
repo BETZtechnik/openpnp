@@ -255,10 +255,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 nozzle = head.getNozzles().get(0);
             }
             if (nozzle.getLocation().getLinearDistanceTo(0, 0) > 90) {
-                MovableUtils.moveToLocationAtSafeZ(
-                        nozzle, 
-                        new Location(LengthUnit.Millimeters, 0, 0, 0, 0), 
-                        1.0);
+                nozzle.moveToSafeZ(1.0);
+                nozzle.moveTo(nozzle.getLocation().derive(0d, 0d, null, null), 1.0);
             }
         }
         
