@@ -22,13 +22,11 @@ import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
 import org.openpnp.gui.components.LocationButtonsPanel;
+import javax.swing.JCheckBox;
 
 public class ReferenceCameraConfigurationWizard extends
         AbstractConfigurationWizard {
     private final ReferenceCamera referenceCamera;
-
-    private JLabel lblSafeZ;
-    private JTextField textSafeZ;
     
     private JTextField textFieldOffX;
     private JTextField textFieldOffY;
@@ -47,6 +45,13 @@ public class ReferenceCameraConfigurationWizard extends
     private JTextField textFieldLocationZ;
     private JTextField textFieldLocationRotation;
     private LocationButtonsPanel locationButtonsPanel;
+    private JCheckBox chckbxFlipX;
+    private JLabel lblFlipX;
+    private JLabel lblFlipY;
+    private JCheckBox checkBoxFlipY;
+    private JLabel lblSafez;
+    private JTextField textFieldSafeZ;
+    private JPanel panelSafeZ;
     
     
     public ReferenceCameraConfigurationWizard(ReferenceCamera referenceCamera) {
@@ -56,16 +61,20 @@ public class ReferenceCameraConfigurationWizard extends
         panelGeneral.setBorder(new TitledBorder(null, "General", TitledBorder.LEADING, TitledBorder.TOP, null, null));
         contentPanel.add(panelGeneral);
         panelGeneral.setLayout(new FormLayout(new ColumnSpec[] {
-        		FormFactory.RELATED_GAP_COLSPEC,
-        		FormFactory.DEFAULT_COLSPEC,
-        		FormFactory.RELATED_GAP_COLSPEC,
-        		FormFactory.DEFAULT_COLSPEC,
-        		ColumnSpec.decode("default:grow"),},
-        	new RowSpec[] {
-        		FormFactory.RELATED_GAP_ROWSPEC,
-        		FormFactory.DEFAULT_ROWSPEC,
-        		FormFactory.RELATED_GAP_ROWSPEC,
-        		FormFactory.DEFAULT_ROWSPEC,}));
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                ColumnSpec.decode("default:grow"),},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,}));
         
         lblRotation = new JLabel("Rotation");
         panelGeneral.add(lblRotation, "2, 2, right, default");
@@ -74,12 +83,17 @@ public class ReferenceCameraConfigurationWizard extends
         panelGeneral.add(textFieldRotation, "4, 2");
         textFieldRotation.setColumns(10);
         
-        lblSafeZ = new JLabel("Safe Z");
-        panelGeneral.add(lblSafeZ, "2, 4, right, default");
+        lblFlipX = new JLabel("Flip Verticle");
+        panelGeneral.add(lblFlipX, "2, 4, right, default");
         
-        textSafeZ = new JTextField();
-        panelGeneral.add(textSafeZ, "4, 4, fill, default");
-        textSafeZ.setColumns(10);
+        chckbxFlipX = new JCheckBox("");
+        panelGeneral.add(chckbxFlipX, "4, 4");
+        
+        lblFlipY = new JLabel("Flip Horizontal");
+        panelGeneral.add(lblFlipY, "2, 6, right, default");
+        
+        checkBoxFlipY = new JCheckBox("");
+        panelGeneral.add(checkBoxFlipY, "4, 6");
 
         panelOffsets = new JPanel();
         contentPanel.add(panelOffsets);
@@ -122,6 +136,25 @@ public class ReferenceCameraConfigurationWizard extends
         textFieldOffZ = new JTextField();
         panelOffsets.add(textFieldOffZ, "6, 4");
         textFieldOffZ.setColumns(8);
+        
+        panelSafeZ = new JPanel();
+        panelSafeZ.setBorder(new TitledBorder(null, "Safe Z", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+        contentPanel.add(panelSafeZ);
+        panelSafeZ.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,}));
+        
+        lblSafez = new JLabel("Safe Z");
+        panelSafeZ.add(lblSafez, "2, 2");
+        
+        textFieldSafeZ = new JTextField();
+        panelSafeZ.add(textFieldSafeZ, "4, 2");
+        textFieldSafeZ.setColumns(10);
         
         panelLocation = new JPanel();
         panelLocation.setBorder(new TitledBorder(null, "Location", TitledBorder.LEADING, TitledBorder.TOP, null, null));
@@ -175,6 +208,7 @@ public class ReferenceCameraConfigurationWizard extends
             locationButtonsPanel = new LocationButtonsPanel(textFieldLocationX, textFieldLocationY, textFieldLocationZ, textFieldLocationRotation);
             panelLocation.add(locationButtonsPanel, "10, 4, fill, fill");
             panelOffsets.setVisible(false);
+            panelSafeZ.setVisible(false);
         }
         else {
             panelLocation.setVisible(false);
@@ -205,9 +239,11 @@ public class ReferenceCameraConfigurationWizard extends
         }
 
         addWrappedBinding(referenceCamera, "rotation", textFieldRotation, "text", doubleConverter);
-        addWrappedBinding(referenceCamera, "safeZ", textSafeZ, "text", doubleConverter);
+        addWrappedBinding(referenceCamera, "flipX", chckbxFlipX, "selected");
+        addWrappedBinding(referenceCamera, "flipY", checkBoxFlipY, "selected");
+        
+        addWrappedBinding(referenceCamera, "safeZ", textFieldSafeZ, "text", doubleConverter);
 
-        ComponentDecorators.decorateWithAutoSelect(textSafeZ);
         ComponentDecorators.decorateWithAutoSelect(textFieldRotation);
         
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldOffX);
@@ -218,5 +254,7 @@ public class ReferenceCameraConfigurationWizard extends
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldLocationY);
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldLocationZ);
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldLocationRotation);
+        
+        ComponentDecorators.decorateWithAutoSelect(textFieldSafeZ);
     }
 }
