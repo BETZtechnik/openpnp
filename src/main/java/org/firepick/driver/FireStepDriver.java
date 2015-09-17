@@ -886,8 +886,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             double x = o.get("x").getAsDouble();
             double y = o.get("y").getAsDouble();
             double radius = o.get("radius").getAsDouble();
-            Location offsets = VisionUtils.getPixelCenterOffsets(camera, x, y);
-            Location location = camera.getLocation().subtract(offsets);
+            Location location = VisionUtils.getPixelLocation(camera, x, y);
             location = location.derive(null, null, null, radius);
             locations.add(location); 
         }

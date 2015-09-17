@@ -88,11 +88,10 @@ public class CarouselFeeder extends ReferenceFeeder {
                 bestMatch.angle -= 90;
             }
             bestMatch.angle = Math.abs(bestMatch.angle);
-            Location l = VisionUtils.getPixelCenterOffsets(
+            Location l = VisionUtils.getPixelLocation(
                     camera, 
                     bestMatch.center.x, 
                     bestMatch.center.y);
-            l = camera.getLocation().subtract(l);
             l = l.derive(null, null, null, bestMatch.angle);
             camera.moveTo(l, 1.0);
             pickLocation = l;
@@ -128,8 +127,12 @@ public class CarouselFeeder extends ReferenceFeeder {
             @Override
             public int compare(RotatedRect o1, RotatedRect o2) {
                 Location origin = new Location(LengthUnit.Millimeters);
-                Double o1Dist = VisionUtils.getPixelCenterOffsets(camera, (int) o1.center.x, (int) o1.center.y).getLinearDistanceTo(origin); 
-                Double o2Dist = VisionUtils.getPixelCenterOffsets(camera, (int) o2.center.x, (int) o2.center.y).getLinearDistanceTo(origin);
+                Double o1Dist = VisionUtils
+                        .getPixelCenterOffsets(camera, o1.center.x, o1.center.y)
+                        .getLinearDistanceTo(origin); 
+                Double o2Dist = VisionUtils
+                        .getPixelCenterOffsets(camera, o2.center.x, o2.center.y)
+                        .getLinearDistanceTo(origin);
                 return o1Dist.compareTo(o2Dist);
             }
         });

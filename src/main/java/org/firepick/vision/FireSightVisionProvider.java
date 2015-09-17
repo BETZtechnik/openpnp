@@ -86,10 +86,14 @@ public class FireSightVisionProvider extends OpenCvVisionProvider {
                 }
             }
             offsets = offsets.derive(null, null, null, angle);
-
-            // Invert Y, since our camera is upside down. Figure out how to handle this in config.
-            offsets = offsets.multiply(1, -1, 1, 1);
-
+            // STOPSHIP
+            // STOPSHIP
+            // STOPSHIP
+            // STOPSHIP
+            // STOPSHIP
+            // angle might be wrong, test it, used to be inverted
+            // also, the subtract below probably needs to be an add now
+            
             // Move the nozzle so that the part is oriented correctly over the
             // camera.
             Location location = nozzle.getLocation();
