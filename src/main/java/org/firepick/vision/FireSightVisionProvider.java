@@ -33,8 +33,12 @@ import org.openpnp.spi.Camera.Looking;
 import org.openpnp.spi.Nozzle;
 import org.openpnp.util.MovableUtils;
 import org.openpnp.util.VisionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FireSightVisionProvider extends OpenCvVisionProvider {
+    private static final Logger logger = LoggerFactory.getLogger(FireSightVisionProvider.class);
+
     @Override
     public Location getPartBottomOffsets(Part part, Nozzle nozzle)
             throws Exception {
@@ -66,7 +70,8 @@ public class FireSightVisionProvider extends OpenCvVisionProvider {
                     result.model.get("minAreaRect").getAsJsonObject().get("rects").getAsJsonArray());
             RotatedRect rect = rects.get(0);
             
-            // Create the offsets object
+            // Create the offsets object. This is the physical distance from
+            // the center of the camera to the located part.
             Location offsets = VisionUtils.getPixelCenterOffsets(
                     camera,
                     rect.center.x, 
@@ -85,25 +90,23 @@ public class FireSightVisionProvider extends OpenCvVisionProvider {
                     angle -= 90;
                 }
             }
-            offsets = offsets.derive(null, null, null, angle);
-            // STOPSHIP
-            // STOPSHIP
-            // STOPSHIP
-            // STOPSHIP
-            // STOPSHIP
-            // angle might be wrong, test it, used to be inverted
-            // also, the subtract below probably needs to be an add now
+            // Set the angle on the offsets.
+            offsets = offsets.derive(null, null, null, -angle);
             
             // Move the nozzle so that the part is oriented correctly over the
             // camera.
-            Location location = nozzle.getLocation();
-            location = location.subtractWithRotation(offsets);
-            
+            Location location = nozzle
+                    .getLocation()
+                    .subtractWithRotation(offsets);
             nozzle.moveTo(location, 1.0);
         }
         
-        Location offsets = camera.getLocation().subtractWithRotation(nozzle.getLocation());
-
+        Location offsets = camera
+                .getLocation()
+                .subtractWithRotation(nozzle.getLocation());
+        
+        logger.debug("Final bottom vision offsets {}", offsets);
+        
         // Return to Safe-Z just to be safe.
         nozzle.moveToSafeZ(1.0);
         return offsets;

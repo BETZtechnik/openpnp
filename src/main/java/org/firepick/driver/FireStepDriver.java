@@ -102,6 +102,10 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
 	@Element(required=false)
 	private RotatableDeltaKinematicsCalculator deltaCalculator = new RotatableDeltaKinematicsCalculator();
+	
+	@Attribute(required=false)
+	private boolean autoUpdateToolOffsets = false;
+
 
     private int rawFeedrate = 12800; //12800 is FireStep's default feedrate
 	private double x, y, z, c;
@@ -126,6 +130,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
 	@Attribute(required=false)
 	private long dispenseTimeMilliseconds = 400;
+	
+	private ReferenceHeadMountable lastToolUsed;
 	
 	/*
 	 * Stores whether or not the machine has been homed. If it has been homed
@@ -258,7 +264,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             else {
                 nozzle = head.getNozzles().get(0);
             }
-            if (nozzle.getLocation().getLinearDistanceTo(0, 0) > 90) {
+            if (nozzle.getLocation().getLinearDistanceTo(0, 0) > 60) {
                 nozzle.moveToSafeZ(1.0);
                 nozzle.moveTo(nozzle.getLocation().derive(0d, 0d, null, null), 1.0);
             }
@@ -286,6 +292,24 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Override
 	public void moveTo(ReferenceHeadMountable hm, Location location, double speed)
 			throws Exception {
+	    // If we're moving the nozzle or paste dispenser for the first time
+	    // or for the first time since moving the other, we check it's
+	    // offsets, since the process of inserting the tool will have
+	    // changed them.
+	    if (autoUpdateToolOffsets 
+	            && lastToolUsed != hm 
+	            && (hm instanceof Nozzle || hm instanceof PasteDispenser)) {
+	        boolean autoUpdateToolOffsets = this.autoUpdateToolOffsets;
+	        this.autoUpdateToolOffsets = false;
+	        try {
+	            updateToolOffsets(hm);
+	        }
+	        finally {
+	            this.autoUpdateToolOffsets = autoUpdateToolOffsets;
+	        }
+	        lastToolUsed = hm;
+	    }
+	    
 	    location = location.subtract(hm.getHeadOffsets());
 	    location = location.convertToUnits(LengthUnit.Millimeters);
 	    // Update the target location to handle any NaNs that were supplied
@@ -806,9 +830,43 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         return nozzle;
     }
     
-    /**
-     * @throws Exception
-     */
+    private void updateToolOffsets(ReferenceHeadMountable hm) throws Exception {
+        if (!(hm instanceof Nozzle) && !(hm instanceof PasteDispenser)) {
+            throw new Exception("Can't check offsets for " + hm);
+        }
+        Camera camera = Configuration.get().getMachine().getCameras().get(0);
+        
+        logger.info("Finding offsets for " + hm);
+        double radius;
+        double nozzleRadius = 38.78037;
+        double dispenserRadius = 17.0709154;
+        if (hm instanceof Nozzle) {
+            radius = nozzleRadius;
+        }
+        else {
+            radius = dispenserRadius;
+        }
+        Location location = camera.getLocation();
+        MovableUtils.moveToLocationAtSafeZ(hm, location, 1.0);
+        for (int i = 0; i < 3; i++) {
+            Thread.sleep(1000);
+            List<Location> locations = findCircles(camera, radius - 2, radius + 2, 400);
+            if (locations.isEmpty()) {
+                throw new Exception("Unable to find candidate circle matches.");
+            }
+            Location visionLocation = locations.get(0);
+            if (visionLocation.getLinearDistanceTo(camera.getLocation()) > 10) {
+                throw new Exception("Found a candidate match but it's too far away. Likely false positive.");
+            }
+            Location offsets = camera.getLocation().subtract(visionLocation);
+            location = location.add(offsets);
+            hm.moveTo(location, 1.0);
+        }
+        Location offsets = camera.getLocation().subtract(location);
+        hm.setHeadOffsets(hm.getHeadOffsets().add(offsets));
+        MovableUtils.moveToLocationAtSafeZ(hm, camera.getLocation(), 1.0);
+    }
+    
     public void checkToolOffsets() throws Exception {
         MainFrame.machineControlsPanel.submitMachineTask(new Runnable() {
             @Override
@@ -1110,7 +1168,15 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		return responses;
 	}
 	
-	@Override
+	public boolean isAutoUpdateToolOffsets() {
+        return autoUpdateToolOffsets;
+    }
+
+    public void setAutoUpdateToolOffsets(boolean autoUpdateToolOffsets) {
+        this.autoUpdateToolOffsets = autoUpdateToolOffsets;
+    }
+
+    @Override
 	public Wizard getConfigurationWizard() {
 		//return null;
 	    return new FireStepDriverWizard(this);

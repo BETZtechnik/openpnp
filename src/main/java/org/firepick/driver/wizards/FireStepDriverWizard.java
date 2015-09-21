@@ -41,6 +41,7 @@ import javax.swing.JTextPane;
 import javax.swing.border.TitledBorder;
 
 import org.firepick.driver.FireStepDriver;
+import org.openpnp.gui.support.IntegerConverter;
 import org.openpnp.machine.reference.ReferenceHeadMountable;
 import org.openpnp.machine.reference.driver.wizards.AbstractSerialPortDriverConfigurationWizard;
 import org.openpnp.model.Configuration;
@@ -55,6 +56,8 @@ import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
 
+import javax.swing.JCheckBox;
+
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
     private List<String> history = new ArrayList<String>();
@@ -66,12 +69,15 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         
         JPanel panelTools = new JPanel();
         contentPanel.add(panelTools);
+        panelTools.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,}));
         
-        JButton btnDetectTool = new JButton(detectTool);
-        panelTools.add(btnDetectTool);
-        
-        JButton btnCheckOffsets = new JButton(checkToolOffsets);
-        panelTools.add(btnCheckOffsets);
+        chckbxAutoDetectTool = new JCheckBox("Auto Detect Tool Offsets on First Move");
+        panelTools.add(chckbxAutoDetectTool, "2, 2");
         
         JPanel panelAngles = new JPanel();
         panelAngles.setBorder(new TitledBorder(null, "Angles", TitledBorder.LEADING, TitledBorder.TOP, null, null));
@@ -241,6 +247,12 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         panelCalibration2.add(labelFrontRight, "6, 8");
     }
  
+    @Override
+    public void createBindings() {
+        super.createBindings();
+        addWrappedBinding(driver, "autoUpdateToolOffsets", chckbxAutoDetectTool, "selected");
+    }
+
     @SuppressWarnings("serial")
     private Action singleZprobe = new AbstractAction("Single Z Probe") {
         @Override
@@ -450,4 +462,5 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     private JTextField angleX;
     private JTextField angleY;
     private JTextField angleZ;
+    private JCheckBox chckbxAutoDetectTool;
 }
