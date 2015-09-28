@@ -86,7 +86,7 @@ public class RotatableDeltaKinematicsCalculator {
      * Carbon rod length.
      */
     @Attribute(required = false)
-    private double rE = 268.000;
+    private double rE = 270.000;
 
     /**
      * Servo horn length.
