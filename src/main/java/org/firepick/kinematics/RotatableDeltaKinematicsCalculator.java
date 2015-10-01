@@ -432,6 +432,80 @@ public class RotatableDeltaKinematicsCalculator {
         return new Location(LengthUnit.Millimeters, x, y, z, 0);
     }
     
+    public double getE() {
+        return e;
+    }
+
+    public void setE(double e) {
+        this.e = e;
+    }
+
+    public double getF() {
+        return f;
+    }
+
+    public void setF(double f) {
+        this.f = f;
+    }
+
+    public double getrE() {
+        return rE;
+    }
+
+    public void setrE(double rE) {
+        this.rE = rE;
+    }
+
+    public double getrF() {
+        return rF;
+    }
+
+    public void setrF(double rF) {
+        this.rF = rF;
+    }
+
+    public double getStepsPerMotorRotation() {
+        return stepsPerMotorRotation;
+    }
+
+    public void setStepsPerMotorRotation(double stepsPerMotorRotation) {
+        this.stepsPerMotorRotation = stepsPerMotorRotation;
+    }
+
+    public double getMotorMicrosteps() {
+        return motorMicrosteps;
+    }
+
+    public void setMotorMicrosteps(double motorMicrosteps) {
+        this.motorMicrosteps = motorMicrosteps;
+    }
+    
+    public double getPulleyReductionX() {
+        return pulleyReductionX;
+    }
+
+    public void setPulleyReductionX(double pulleyReductionX) {
+        this.pulleyReductionX = pulleyReductionX;
+    }
+
+    public double getPulleyReductionY() {
+        return pulleyReductionY;
+    }
+
+    public void setPulleyReductionY(double pulleyReductionY) {
+        this.pulleyReductionY = pulleyReductionY;
+    }
+
+    public double getPulleyReductionZ() {
+        return pulleyReductionZ;
+    }
+
+    public void setPulleyReductionZ(double pulleyReductionZ) {
+        this.pulleyReductionZ = pulleyReductionZ;
+    }
+
+
+
     @SuppressWarnings("serial")
     public static class RotatableDeltaKinematicsException extends Exception {
         public RotatableDeltaKinematicsException(String message) {
