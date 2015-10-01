@@ -95,7 +95,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private boolean nozzleEnabled = false;
 	private boolean powerSupplyOn = false;
 	@Element(required=false)
-	private boolean usePwmVacuum = true; // Intended to provide legacy support for older FireStep versions.. might remove this later.
+	private boolean usePwmVacuum = false; // Intended to provide legacy support for older FireStep versions.. might remove this later.
 	@Element(required=false)
 	private int PwmVacuumSetting = 50;   // Provides a default value.  This might change later depending on whether we want to 
 	                                     // run the pump harder for larger parts (might depend on nozzle, part size, etc..).
