@@ -32,6 +32,7 @@ import java.util.List;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -41,14 +42,15 @@ import javax.swing.JTextPane;
 import javax.swing.border.TitledBorder;
 
 import org.firepick.driver.FireStepDriver;
-import org.openpnp.gui.support.IntegerConverter;
+import org.openpnp.gui.MainFrame;
+import org.openpnp.gui.components.CameraView;
+import org.openpnp.gui.support.MessageBoxes;
 import org.openpnp.machine.reference.ReferenceHeadMountable;
 import org.openpnp.machine.reference.driver.wizards.AbstractSerialPortDriverConfigurationWizard;
 import org.openpnp.model.Configuration;
 import org.openpnp.model.Location;
 import org.openpnp.spi.HeadMountable;
 import org.openpnp.spi.Nozzle;
-import org.openpnp.spi.PasteDispenser;
 
 import com.google.gson.JsonObject;
 import com.jgoodies.forms.factories.FormFactory;
@@ -56,12 +58,11 @@ import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
 
-import javax.swing.JCheckBox;
-
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
     private List<String> history = new ArrayList<String>();
     private int historyIndex = 0;
+    private double gfilterCircleDiameter;
     
     public FireStepDriverWizard(FireStepDriver driver) {
         super(driver);
@@ -78,6 +79,128 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         
         chckbxAutoDetectTool = new JCheckBox("Auto Detect Tool Offsets on First Move");
         panelTools.add(chckbxAutoDetectTool, "2, 2");
+        
+        JPanel panelTerminal = new JPanel();
+        panelTerminal.setBorder(new TitledBorder(null, "Terminal", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+        contentPanel.add(panelTerminal);
+        panelTerminal.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                ColumnSpec.decode("default:grow"),
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                RowSpec.decode("100dlu"),}));
+        
+        terminalCommandTextField = new JTextField();
+        panelTerminal.add(terminalCommandTextField, "2, 2, fill, default");
+        terminalCommandTextField.setColumns(10);
+        terminalCommandTextField.setAction(send);
+        terminalCommandTextField.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_UP) {
+                    if (++historyIndex >= history.size()) {
+                        historyIndex = history.size() - 1;
+                    }
+                    terminalCommandTextField.setText(history.get(historyIndex));
+                }
+                else if (e.getKeyCode() == KeyEvent.VK_DOWN) {
+                    if (--historyIndex < 0) {
+                        historyIndex = 0;
+                    }
+                    terminalCommandTextField.setText(history.get(historyIndex));
+                }
+                else {
+                    super.keyTyped(e);
+                }
+            }
+        });
+        
+        JButton btnSend = new JButton(send);
+        panelTerminal.add(btnSend, "4, 2");
+        
+        JScrollPane scrollPane_1 = new JScrollPane();
+        panelTerminal.add(scrollPane_1, "2, 4, 3, 1, fill, fill");
+        
+        terminalLogTextPane = new JTextPane();
+        scrollPane_1.setViewportView(terminalLogTextPane);
+        
+        //Setup panel
+        JPanel panelCalibration = new JPanel();
+        panelCalibration.setBorder(new TitledBorder(null, "Calibration", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+        contentPanel.add(panelCalibration);
+        contentPanel.add(panelCalibration);
+        panelCalibration.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                ColumnSpec.decode("default:grow"),},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                RowSpec.decode("100dlu"),}));
+        
+        JPanel panel = new JPanel();
+        FlowLayout flowLayout = (FlowLayout) panel.getLayout();
+        flowLayout.setAlignment(FlowLayout.LEFT);
+        panelCalibration.add(panel, "2, 2, fill, fill");
+        
+        JButton singleZprobeButton = new JButton(probePoint);
+        panel.add(singleZprobeButton);
+        
+        JButton btnHexZProbe = new JButton(probeHex);
+        panel.add(btnHexZProbe);
+        
+        JButton btnDetailedZProbe = new JButton(probeGrid);
+        panel.add(btnDetailedZProbe);
+        
+        btnMeasure = new JButton(measureStart);
+        panel.add(btnMeasure);
+        
+        JButton btnGfilter = new JButton(gFilter);
+        panel.add(btnGfilter);
+        
+        JScrollPane scrollPane = new JScrollPane();
+        panelCalibration.add(scrollPane, "2, 4, fill, fill");
+        
+        zProbeResultsTextPane = new JTextPane();
+        scrollPane.setViewportView(zProbeResultsTextPane);
+        
+        JPanel panelCalibration2 = new JPanel();
+        contentPanel.add(panelCalibration2);
+        panelCalibration2.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,}));
+        
+        JButton btnCornersZProbe = new JButton(probeCorners);
+        panelCalibration2.add(btnCornersZProbe, "4, 2");
+        
+        labelBackLeft = new JLabel("100.000");
+        panelCalibration2.add(labelBackLeft, "2, 4");
+        
+        labelBackRight = new JLabel("100.000");
+        panelCalibration2.add(labelBackRight, "6, 4");
+        
+        labelFrontLeft = new JLabel("100.000");
+        panelCalibration2.add(labelFrontLeft, "2, 8");
+        
+        labelFrontRight = new JLabel("100.000");
+        panelCalibration2.add(labelFrontRight, "6, 8");
         
         JPanel panelAngles = new JPanel();
         panelAngles.setBorder(new TitledBorder(null, "Angles", TitledBorder.LEADING, TitledBorder.TOP, null, null));
@@ -126,125 +249,6 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         
         JButton btnGo = new JButton(goToAngles);
         panelAngles.add(btnGo, "8, 4");
-        
-        JPanel panelTerminal = new JPanel();
-        panelTerminal.setBorder(new TitledBorder(null, "Terminal", TitledBorder.LEADING, TitledBorder.TOP, null, null));
-        contentPanel.add(panelTerminal);
-        panelTerminal.setLayout(new FormLayout(new ColumnSpec[] {
-                FormFactory.RELATED_GAP_COLSPEC,
-                ColumnSpec.decode("default:grow"),
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,},
-            new RowSpec[] {
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,
-                FormFactory.RELATED_GAP_ROWSPEC,
-                RowSpec.decode("max(100dlu;default):grow"),}));
-        
-        terminalCommandTextField = new JTextField();
-        panelTerminal.add(terminalCommandTextField, "2, 2, fill, default");
-        terminalCommandTextField.setColumns(10);
-        terminalCommandTextField.setAction(send);
-        terminalCommandTextField.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyReleased(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_UP) {
-                    if (++historyIndex >= history.size()) {
-                        historyIndex = 0;
-                    }
-                    terminalCommandTextField.setText(history.get(historyIndex));
-                }
-                else if (e.getKeyCode() == KeyEvent.VK_DOWN) {
-                    if (--historyIndex < 0) {
-                        historyIndex = history.size() - 1;
-                    }
-                    terminalCommandTextField.setText(history.get(historyIndex));
-                }
-                else {
-                    super.keyTyped(e);
-                }
-            }
-        });
-        
-        JButton btnSend = new JButton(send);
-        panelTerminal.add(btnSend, "4, 2");
-        
-        JScrollPane scrollPane_1 = new JScrollPane();
-        panelTerminal.add(scrollPane_1, "2, 4, 3, 1, fill, fill");
-        
-        terminalLogTextPane = new JTextPane();
-        scrollPane_1.setViewportView(terminalLogTextPane);
-        
-        //Setup panel
-        JPanel panelCalibration = new JPanel();
-        panelCalibration.setBorder(new TitledBorder(null, "Calibration", TitledBorder.LEADING, TitledBorder.TOP, null, null));
-        contentPanel.add(panelCalibration);
-        contentPanel.add(panelCalibration);
-        panelCalibration.setLayout(new FormLayout(new ColumnSpec[] {
-                FormFactory.RELATED_GAP_COLSPEC,
-                ColumnSpec.decode("default:grow"),},
-            new RowSpec[] {
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,
-                FormFactory.RELATED_GAP_ROWSPEC,
-                RowSpec.decode("max(100px;default):grow"),}));
-        
-        JPanel panel = new JPanel();
-        FlowLayout flowLayout = (FlowLayout) panel.getLayout();
-        flowLayout.setAlignment(FlowLayout.LEFT);
-        panelCalibration.add(panel, "2, 2, fill, fill");
-        
-        JButton singleZprobeButton = new JButton(singleZprobe);
-        panel.add(singleZprobeButton);
-        
-        JButton btnHexZProbe = new JButton(hexZprobe);
-        panel.add(btnHexZProbe);
-        
-        JButton btnDetailedZProbe = new JButton(detailedZprobe);
-        panel.add(btnDetailedZProbe);
-        
-        JButton btnGfilter = new JButton(gFilter);
-        panel.add(btnGfilter);
-        
-        JScrollPane scrollPane = new JScrollPane();
-        panelCalibration.add(scrollPane, "2, 4, fill, fill");
-        
-        zProbeResultsTextPane = new JTextPane();
-        scrollPane.setViewportView(zProbeResultsTextPane);
-        
-        JPanel panelCalibration2 = new JPanel();
-        contentPanel.add(panelCalibration2);
-        panelCalibration2.setLayout(new FormLayout(new ColumnSpec[] {
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,},
-            new RowSpec[] {
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,}));
-        
-        JButton btnCornersZProbe = new JButton(cornerZprobe);
-        panelCalibration2.add(btnCornersZProbe, "4, 2");
-        
-        labelBackLeft = new JLabel("100.000");
-        panelCalibration2.add(labelBackLeft, "2, 4");
-        
-        labelBackRight = new JLabel("100.000");
-        panelCalibration2.add(labelBackRight, "6, 4");
-        
-        labelFrontLeft = new JLabel("100.000");
-        panelCalibration2.add(labelFrontLeft, "2, 8");
-        
-        labelFrontRight = new JLabel("100.000");
-        panelCalibration2.add(labelFrontRight, "6, 8");
     }
  
     @Override
@@ -254,13 +258,13 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     }
 
     @SuppressWarnings("serial")
-    private Action singleZprobe = new AbstractAction("Single Z Probe") {
+    private Action probePoint = new AbstractAction("Single Z Probe") {
         @Override
         public void actionPerformed(ActionEvent arg0) {
             final Nozzle nozzle = Configuration.get().getMachine().getHeads().get(0).getNozzles().get(0); //Assumes one head on the machine
             try {
                 Location originalLocation = nozzle.getLocation();
-                Location result = driver.doZprobePoint((ReferenceHeadMountable) nozzle, nozzle.getLocation());
+                Location result = driver.probePoint((ReferenceHeadMountable) nozzle, nozzle.getLocation());
                 nozzle.moveTo(originalLocation, 1.0);
                 zProbeResultsTextPane.setText(zProbeResultsTextPane.getText() + result.toString() + "\r\n");
             }
@@ -271,12 +275,12 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     };
     
     @SuppressWarnings("serial")
-    private Action hexZprobe = new AbstractAction("Hex Z Probe") {
+    private Action probeHex = new AbstractAction("Hex Z Probe") {
         @Override
         public void actionPerformed(ActionEvent arg0) {
             final Nozzle nozzle = Configuration.get().getMachine().getHeads().get(0).getNozzles().get(0); //Assumes one head on the machine
             try {
-                List<Location> results = driver.doZprobeHex((ReferenceHeadMountable) nozzle);
+                List<Location> results = driver.probeHex((ReferenceHeadMountable) nozzle);
                 zProbeResultsTextPane.setText(zProbeResultsTextPane.getText() + results.toString() + "\r\n");
                 terminalLogTextPane.scrollRectToVisible(new Rectangle(0, terminalLogTextPane.getBounds(null).height, 1, 1));            
             }
@@ -287,12 +291,12 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     };
     
     @SuppressWarnings("serial")
-    private Action detailedZprobe = new AbstractAction("Detailed Z Probe") {
+    private Action probeGrid = new AbstractAction("Detailed Z Probe") {
         @Override
         public void actionPerformed(ActionEvent arg0) {
             final Nozzle nozzle = Configuration.get().getMachine().getHeads().get(0).getNozzles().get(0); //Assumes one head on the machine
             try {
-                double[][] results = driver.doZProbeDetailed((ReferenceHeadMountable) nozzle);
+                double[][] results = driver.probeGrid((ReferenceHeadMountable) nozzle);
                 resolveMissingDetailedZprobeData(results);
                 String s = "";
                 for (int y = 0, yCount = results.length; y < yCount; y++) {
@@ -359,17 +363,21 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     }
     
     @SuppressWarnings("serial")
-    private Action cornerZprobe = new AbstractAction("Corner Z Probe") {
+    private Action probeCorners = new AbstractAction("Corner Z Probe") {
         @Override
         public void actionPerformed(ActionEvent arg0) {
             final Nozzle nozzle = Configuration.get().getMachine().getHeads().get(0).getNozzles().get(0); //Assumes one head on the machine
             try {
-                List<Location> results = driver.doZprobeCorners((ReferenceHeadMountable) nozzle);
+                List<Location> results = driver.probeCorners((ReferenceHeadMountable) nozzle);
                 // front left, front right, back right, back left
-                labelFrontLeft.setText("" + results.get(0).getZ());
-                labelFrontRight.setText("" + results.get(1).getZ());
-                labelBackRight.setText("" + results.get(2).getZ());
-                labelBackLeft.setText("" + results.get(3).getZ());
+                Location frontLeft = results.get(0);
+                Location frontRight = results.get(1);
+                Location backRight = results.get(2);
+                Location backLeft = results.get(3);
+                labelFrontLeft.setText("" + frontLeft.subtract(frontLeft).getZ());
+                labelFrontRight.setText("" + frontRight.subtract(frontLeft).getZ());
+                labelBackRight.setText("" + backRight.subtract(frontLeft).getZ());
+                labelBackLeft.setText("" + backLeft.subtract(frontLeft).getZ());
             }
             catch (Exception e1){
                 JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -384,7 +392,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         public void actionPerformed(ActionEvent arg0) {
             try {
                 List<JsonObject> responses = driver.sendJsonCommand(terminalCommandTextField.getText(), 30000);
-                String s = "";
+                String s = terminalCommandTextField.getText() + " => ";
                 for (JsonObject o : responses) {
                     s += o.toString() + "\r\n";
                 }
@@ -417,7 +425,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         @Override
         public void actionPerformed(ActionEvent arg0) {
             try {
-                driver.generateGfilter();
+                driver.generateGfilter(gfilterCircleDiameter / 2);
             }
             catch (Exception e1){
                 JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -452,6 +460,34 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         }
     };
     
+    private Action measureStart = new AbstractAction("Measure") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            btnMeasure.setAction(measureConfirm);
+            CameraView cameraView = MainFrame.cameraPanel.getSelectedCameraView();
+            if (cameraView == null) {
+                MessageBoxes.errorBox(FireStepDriverWizard.this, "Error", "Unable to locate Camera.");
+            }
+            cameraView.setSelectionEnabled(true);
+            cameraView.setSelection(0, 0, 100, 100);
+        }
+    };
+    
+    private Action measureConfirm = new AbstractAction("Confirm") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            btnMeasure.setAction(measureStart);
+            CameraView cameraView = MainFrame.cameraPanel.getSelectedCameraView();
+            if (cameraView == null) {
+                MessageBoxes.errorBox(FireStepDriverWizard.this, "Error", "Unable to locate Camera.");
+            }
+            cameraView.setSelectionEnabled(false);
+            Rectangle selection = cameraView.getSelection();
+            gfilterCircleDiameter = (selection.getWidth() + selection.getHeight()) / 2;
+            System.out.println(gfilterCircleDiameter);
+        }
+    };
+    
     private JTextField terminalCommandTextField;
     private JTextPane terminalLogTextPane;
     private JTextPane zProbeResultsTextPane;
@@ -463,4 +499,5 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     private JTextField angleY;
     private JTextField angleZ;
     private JCheckBox chckbxAutoDetectTool;
+    private JButton btnMeasure;
 }

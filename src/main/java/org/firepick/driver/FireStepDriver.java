@@ -35,8 +35,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.Action;
@@ -111,10 +111,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private double x, y, z, c;
 	private Thread readerThread;
 	private boolean disconnectRequested;
-	private Object commandLock = new Object();
 	private boolean connected;
 	private String connectedVersion;
-	private Queue<String> responseQueue = new ConcurrentLinkedQueue<String>();
+	private LinkedBlockingQueue<JsonObject> responseQueue = new LinkedBlockingQueue<>();
 	private JsonParser parser = new JsonParser();
 	
 	@Attribute(required=false)
@@ -132,6 +131,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private long dispenseTimeMilliseconds = 400;
 	
 	private ReferenceHeadMountable lastToolUsed;
+	
+	private boolean useFireStepKinematics = true;
 	
 	/*
 	 * Stores whether or not the machine has been homed. If it has been homed
@@ -220,7 +221,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    		enableUpLookingRingLight(false);   		// Turn off up-looking LED ring light
 	    		if (powerSupplyOn)
 	    		{
-			        home(null);                        	// home the machine
+//			        home(null);                        	// home the machine
                     enableVacuumPump(false);            // Turn the vacuum pump OFF
                     enableDispenser(false);
 					setXyzMotorEnable(false);  			// Disable power for XYZ stepper motors
@@ -271,7 +272,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         }
         
         RawStepTriplet rs = deltaCalculator.getHomeRawSteps();
-        sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
+        if (useFireStepKinematics) {
+            sendJsonCommand(String.format("{'hom':''}"), 30000);
+        }
+        else {
+            sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
+        }
         setLocation(getFireStepLocation());
         homed = true;
 	}
@@ -329,7 +335,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             scaledLocation = barycentric.interpolate(scaledLocation);
         }
 	    
-        moveToRaw(hm, scaledLocation, speed);
+        if (useFireStepKinematics) {
+            moveToFireStepKinematics(hm, scaledLocation, speed);
+        }
+        else {
+            moveToRaw(hm, scaledLocation, speed);
+        }
 
         // TODO: Since we handle the NaNs up top we can probably skip all
         // these checks, but think about it a bit first.
@@ -458,34 +469,35 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		 * Connection process notes:
 		 * 
 		 * On some platforms, as soon as we open the serial port it will reset
-		 * Grbl and we'll start getting some data. On others, Grbl may already
-		 * be running and we will get nothing on connect.
+		 * FireStep and we'll start getting some data. On others, FireStep may
+		 * already be running and we will get nothing on connect.
 		 */
+	    
+		readerThread = new Thread(this);
+		readerThread.start();
 		
-		List<String> responses;
-		synchronized (commandLock) {
-			// Start the reader thread with the commandLock held. This will
-			// keep the thread from quickly parsing any responses messages
-			// and notifying before we get a change to wait.
-			readerThread = new Thread(this);
-			readerThread.start();
-			// Wait up to 3 seconds for FireStep to say Hi
-			// If we get anything at this point it will have been the settings
-			// dump that is sent after reset.
-			responses = sendCommand(null, 3000);
-		}
-	
-		connectedVersion = "";
-		connected = true;
-		processStatusResponses(responses);
-	
-		for (int i = 0; i < 5 && !connected; i++) {
-			sendJsonCommand("{'sys':''}",100);
-		}
+		// Wait up to 3 seconds for FireStep to say hi, and throw away the
+		// results. Due to the startup EEPROM stuff this could include
+		// any number of messages. We just want to ignore it all.
+		List<JsonObject> responses = sendJsonCommand(null, 3000);
 		
-	if (!connected)  {
+		// Now send the version request. Any previous version response should
+		// have been eaten up earlier so the next one we see should represent
+		// being synchronized to the flow control.
+        connectedVersion = "";
+        connected = false;
+        // Look for the version response
+        for (JsonObject o : sendJsonCommand("{'sysv':''}")) {
+            JsonObject response = o.get("r").getAsJsonObject();
+            if (response.has("sysv")) {
+                connected = true;
+                connectedVersion = response.get("sysv").getAsString(); 
+            }
+        }
+	
+		if (!connected)  {
 			throw new Error(
-				String.format("Unable to receive connection response from FireStep. Check your port and baud rate, and that you are running at least version %f of Marlin", 
+				String.format("Unable to receive connection response from FireStep. Check your port and baud rate, and that you are running at least version %f of FireStep", 
 						minimumRequiredVersion));
 		}
 		
@@ -496,9 +508,10 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		
 	    //TODO: Allow configuration of modular tools 
 		setXyzMotorEnable(false);    // Disable all motors
+        setFireStepKinematicsEnabled(useFireStepKinematics);
         setMotorDirection(true, false, false); // Set X/Y motors to normal and rotation to inverted.
 		setHomingSpeed(200);				// Set the homing speed to something slower than default
-		sendJsonCommand("{'ape':34}", 100); // Set the enable pin for axis 'a' to tool 4 (this is an ugly hack and should go away)
+		sendJsonCommand("{'ape':34}"); // Set the enable pin for axis 'a' to tool 4 (this is an ugly hack and should go away)
 		// Turn off the stepper drivers
 		setEnabled(false);
 	}
@@ -531,8 +544,20 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	 * @throws Exception
 	 */
 	public Location getFireStepLocation() throws Exception {
-	    JsonObject o = sendJsonCommand("{'mpo':''}", 1000).get(0).get("r").getAsJsonObject().get("mpo").getAsJsonObject();
-	    return parseLocationFromSteps(o, new String[] { "1", "2", "3" });
+	    if (useFireStepKinematics) {
+            JsonObject o = sendJsonCommand("{'mpo':''}").get(0).get("r").getAsJsonObject().get("mpo").getAsJsonObject();
+            // TODO: Rotation
+            return new Location(LengthUnit.Millimeters, 
+                    o.get("x").getAsDouble(),
+                    o.get("y").getAsDouble(),
+                    o.get("z").getAsDouble(),
+                    0
+                    );
+	    }
+	    else {
+	        JsonObject o = sendJsonCommand("{'mpo':''}").get(0).get("r").getAsJsonObject().get("mpo").getAsJsonObject();
+	        return parseLocationFromSteps(o, new String[] { "1", "2", "3" });
+	    }
 	}
 	
 	/**
@@ -564,56 +589,47 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         return deltaCalculator.getLocation(new RawStepTriplet(x, y, z));
 	}
 	
-	public List<Location> doZprobeHex(ReferenceHeadMountable hm) throws Exception {
-	    List<Location> locations = new ArrayList<Location>();
-	    double radius = 50;
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0)));
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0)));
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(60)));
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(120)));
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(180)));
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(240)));
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(300)));
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0)));
-        return locations;
+	public List<Location> probeHex(ReferenceHeadMountable hm) throws Exception {
+//	    List<Location> locations = new ArrayList<Location>();
+//	    double radius = 50;
+//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0)));
+//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0)));
+//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(60)));
+//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(120)));
+//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(180)));
+//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(240)));
+//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(300)));
+//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0)));
+//        return locations;
+	    throw new Exception("No!");
 	}
 
-    public List<Location> doZprobeCorners(ReferenceHeadMountable hm) throws Exception {
+    public List<Location> probeCorners(ReferenceHeadMountable hm) throws Exception {
+        Location startLocation = hm.getLocation();
         double distance = 85;
         List<Location> locations = new ArrayList<Location>();
         // front left
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, -distance, -distance, 0, 0)));
+        locations.add(probePoint(hm, startLocation.derive(-distance, -distance, null, null)));
         // front right
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, distance, -distance, 0, 0)));
+        locations.add(probePoint(hm, startLocation.derive(distance, -distance, null, null)));
         // back right
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, distance, distance, 0, 0)));
+        locations.add(probePoint(hm, startLocation.derive(distance, distance, null, null)));
         // back left
-        locations.add(doZprobePoint(hm, new Location(LengthUnit.Millimeters, -distance, distance, 0, 0)));
-        hm.moveTo(new Location(LengthUnit.Millimeters, 0, 0, 0, 0), 1.0);
+        locations.add(probePoint(hm, startLocation.derive(-distance, distance, null, null)));
+        hm.moveTo(startLocation, 1.0);
         return locations;
     }
 
-	public Location doZprobePoint(ReferenceHeadMountable hm, Location startPoint)  throws Exception {
-		this.moveTo(hm, startPoint, 1.0);
-		
-		//Determine point "below" the current target point.  Use inverse kinematics to get a point at Z=-20
-		Location targetPoint =  new Location(LengthUnit.Millimeters, startPoint.getX(), startPoint.getY(), -100, 0);
-		RawStepTriplet raw = deltaCalculator.getRawSteps(targetPoint);
-		logger.debug(String.format("Do Z probe point : Location X=%.2f, Y=%.2f, Z=%.2f.",targetPoint.getX(), targetPoint.getY(), targetPoint.getZ() ));
-		logger.debug(String.format("Do Z probe point : Raw angle %d, %d, %d.", raw.x, raw.y, raw.z ));
-		
-		int probePin = 6; //TODO: Make this configurable in EMC02 class
-		//this.moveTo(hm,targetPoint, 1.0); //this is just for debugging, it's mutually exclusive with the prb command below...
-		String prbStr = new String(String.format("{'prb':{'x':%d,'y':%d,'z':%d,'pn':%d}}",raw.x, raw.y, raw.z, probePin));
-		List<JsonObject> responses = sendJsonCommand( prbStr, 5000 );
-		logger.debug("Do Z probe point : Returning..");
-		JsonObject o = responses.get(0).getAsJsonObject().get("r").getAsJsonObject().get("prb").getAsJsonObject();
-		Location location = parseLocationFromSteps(o, new String[] { "x", "y", "z" });
+	public Location probePoint(ReferenceHeadMountable hm, Location startLocation)  throws Exception {
+		hm.moveTo(startLocation, 1.0);
+		sendJsonCommand("{'prb':''}", 30000);
 		setLocation(getFireStepLocation());
-        return location;
+		Location location = hm.getLocation();
+		hm.moveTo(startLocation, 1.0);
+		return location;
 	}
 	
-    public double[][] doZProbeDetailed(ReferenceHeadMountable hm) throws Exception {
+    public double[][] probeGrid(ReferenceHeadMountable hm) throws Exception {
         logger.debug("Performing Z probe...");
         
         double DELTA_PROBABLE_RADIUS = 90.0; //214mm / 2 -10
@@ -622,7 +638,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         double BACK_PROBE_BED_POSITION  =  DELTA_PROBABLE_RADIUS;
         double FRONT_PROBE_BED_POSITION = -DELTA_PROBABLE_RADIUS;
 
-        int ACCURATE_BED_LEVELING_POINTS = 9;       
+        int ACCURATE_BED_LEVELING_POINTS = 7;       
         double ACCURATE_BED_LEVELING_GRID_Y = ((BACK_PROBE_BED_POSITION - FRONT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
         double ACCURATE_BED_LEVELING_GRID_X = ((RIGHT_PROBE_BED_POSITION - LEFT_PROBE_BED_POSITION) / (ACCURATE_BED_LEVELING_POINTS - 1));
 
@@ -630,7 +646,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         
         // First, do a probe at 0,0 to determine the approximate bed height and then work
         // slightly above it.
-        Location startLocation = doZprobePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0));
+        Location startLocation = probePoint(hm, hm.getLocation().derive(0d, 0d, null, null));
         startLocation = startLocation.add(new Location(LengthUnit.Millimeters, 0, 0, 20, 0));
 
         for (int yCount = 0; yCount < ACCURATE_BED_LEVELING_POINTS; yCount++) {
@@ -656,7 +672,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                     // Now do the Z probe
                     Location probedLocation = new Location(LengthUnit.Millimeters, xProbe, yProbe, startLocation.getZ(), 0);
                     double measured_z = 0;
-                    measured_z = doZprobePoint(hm, probedLocation).getZ();
+                    measured_z = probePoint(hm, probedLocation).getZ();
                     bed_level[xCount][yCount] = measured_z;
                 }
                 else {
@@ -668,7 +684,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         return bed_level;
     }
     
-    public void generateGfilter() throws Exception {
+    public void generateGfilter(final double radius) throws Exception {
         final int gridX = 19, gridY = 19;
         final double deltaX = 10, deltaY = 10;
         final int numTries = 10;
@@ -707,7 +723,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                             Thread.sleep(1000);
                             
                             // find the circle
-                            List<Location> circles = findCircles(camera, 85, 95, 100);
+                            List<Location> circles = findCircles(camera, radius - 5, radius + 5, 100);
                             Location visionLocation2 = null;
                             if (!circles.isEmpty()) {
                                 visionLocation2 = circles.get(0);
@@ -1057,7 +1073,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	public void toggleDigitalPin(int pin, boolean state) throws Exception {
 	    logger.trace(String.format("FireStep: Toggling digital pin %d to %s", pin, state?"HIGH":"LOW" ));
         try {
-			sendJsonCommand(String.format("{'iod%d':%s}", pin, state?"true":"false"),100);
+			sendJsonCommand(String.format("{'iod%d':%s}", pin, state?"true":"false"));
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -1068,7 +1084,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    logger.trace(String.format("FireStep: Setting PWM pin %d to %d", pin, value ));
         try {
         	//TODO: Throw an exception if value is not between 0 and 255.
-			sendJsonCommand(String.format("{'ioa%d':%d}", pin, value),100);
+			sendJsonCommand(String.format("{'ioa%d':%d}", pin, value));
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -1077,67 +1093,114 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 
 	private void sendFireStepConfig(boolean xyz, boolean rot, String param, String value) throws Exception {
 	    if (xyz && rot) {
-			sendJsonCommand(String.format("{'x%s':%s,'y%s':%s,'z%s':%s,'a%s':%s}",param,value,param,value,param,value,param,value), 100);
+			sendJsonCommand(String.format("{'x%s':%s,'y%s':%s,'z%s':%s,'a%s':%s}",param,value,param,value,param,value,param,value));
 	    }
 	    else if (xyz) {
-			sendJsonCommand(String.format("{'x%s':%s,'y%s':%s,'z%s':%s}",param,value,param,value,param,value), 100);
+			sendJsonCommand(String.format("{'x%s':%s,'y%s':%s,'z%s':%s}",param,value,param,value,param,value));
 	    }
 	    else if (rot) {
-			sendJsonCommand(String.format("{'a%s':%s}",param,value), 100);
+			sendJsonCommand(String.format("{'a%s':%s}",param,value));
 	    }
 	}
 	
-	private List<JsonObject> processStatusResponses(List<String> responses) throws Exception {
-	    List<JsonObject> objects = new ArrayList<JsonObject>();
-		for (String response : responses) 
-		{
-			if (response.startsWith("FireStep")) {
-				logger.debug("echo: " + response);
-				String[] versionComponents = response.split(" ");
-				connectedVersion = versionComponents[1];
-				connected = true;
-				logger.debug(String.format("Connected to FireStep Version: %s", connectedVersion));
-			}
-			else {
-			    JsonObject o = (JsonObject) parser.parse(response);
-			    if (o.get("s").getAsInt() != 0) {
-			        throw new Exception("FireStep command failed: " + o);
-			    }
-			    objects.add(o);
-			}
-		}
-		return objects;
+    private void setFireStepKinematicsEnabled(boolean enabled) throws Exception {
+        if (enabled) {
+            sendJsonCommand("{'systo':1}");
+            // I know these can all be sent in one go, but it makes the
+            // code hard to read and modify. Feel free to change it if it
+            // bugs you.
+            sendJsonCommand(String.format("{'dimst':%d}", (int) deltaCalculator.getStepsPerMotorRotation()));
+            sendJsonCommand(String.format("{'dimmi':%d}", (int) deltaCalculator.getMotorMicrosteps()));
+//            sendJsonCommand(String.format("{'dimgr1':%f}", deltaCalculator.getPulleyReductionX()));
+//            sendJsonCommand(String.format("{'dimgr2':%f}", deltaCalculator.getPulleyReductionY()));
+//            sendJsonCommand(String.format("{'dimgr3':%f}", deltaCalculator.getPulleyReductionZ()));
+            sendJsonCommand(String.format("{'dimgr':%f}",
+                    (deltaCalculator.getPulleyReductionX() +
+                    deltaCalculator.getPulleyReductionY() +
+                    deltaCalculator.getPulleyReductionZ()) / 3
+                    ));
+            sendJsonCommand(String.format("{'dime':%f}", deltaCalculator.getE()));
+            sendJsonCommand(String.format("{'dimf':%f}", deltaCalculator.getF()));
+            sendJsonCommand(String.format("{'dimre':%f}", deltaCalculator.getrE()));
+            sendJsonCommand(String.format("{'dimrf':%f}", deltaCalculator.getrF()));
+//            sendJsonCommand(String.format("{'dimha':%f}", 0f));
+//            sendJsonCommand(String.format("{'xlb':%d}", (int) (deltaCalculator.getHomeRawSteps().x + 200)));
+//            sendJsonCommand(String.format("{'ylb':%d}", (int) (deltaCalculator.getHomeRawSteps().y + 200)));
+//            sendJsonCommand(String.format("{'zlb':%d}", (int) (deltaCalculator.getHomeRawSteps().z + 200)));
+        }
+        else {
+            sendJsonCommand("{'systo':0}");
+        }
+    }
+    
+    /**
+     * Send a command and wait 5 seconds for a response. This is just a
+     * shortcut for {@link #sendJsonCommand(String, long)} with a default
+     * timeout.
+     * @param command
+     * @return
+     * @throws Exception
+     */
+    public List<JsonObject> sendJsonCommand(String command) throws Exception {
+        return sendJsonCommand(command, 5000);
+    }
+	
+	/**
+	 * Send a command and wait timeout milliseconds for it to return.
+	 * @param command
+	 * @param timeout
+	 * @return
+	 * @throws Exception
+	 */
+    public List<JsonObject> sendJsonCommand(String command, long timeout) throws Exception {
+        List<JsonObject> responses = new ArrayList<>();
+        
+        // Read any responses that might be queued up so that when we wait
+        // for a response to a command we actually wait for the one we expect.
+        responseQueue.drainTo(responses);
+
+        if (command != null) {
+            // Replace single quotes with double quotes. This makes it easier to
+            // write the commands in code without having to constantly escape
+            // double quotes. We need the double quotes so it will parse
+            // correctly.
+            command = command.replaceAll("'", "\"");
+            logger.debug("sendCommand({}, {})", command, timeout);
+            output.write(command.getBytes());
+            output.write("\n".getBytes());
+        }
+        
+        // Wait up to timeout milliseconds for the a response to return from
+        // the reader.
+        JsonObject response = responseQueue.poll(timeout, TimeUnit.MILLISECONDS);
+        if (response == null) {
+            throw new Exception("Timeout waiting for response to " + command);
+        }
+        // And if we got one, add it to the list of responses we'll return.
+        responses.add(response);
+        
+        // Read any additional responses that came in after the initial one.
+        responseQueue.drainTo(responses);
+
+        // Check if any of the responses were failures.
+        for (JsonObject o : responses) {
+            if (o.has("s") && o.get("s").getAsInt() != 0) {
+                throw new Exception("FireStep command failed " + o);
+            }
+        }
+        
+        logger.debug("Responses: {}", responses);
+        return responses;
 	}
 	
-	public List<JsonObject> sendJsonCommand(String command, long timeout) throws Exception {
-		List<String> responses = sendCommand(command.replaceAll("'", "\""), timeout);
-		return processStatusResponses(responses);
-	}
-	
-	private List<String> sendCommand(String command, long timeout) throws Exception {
-		synchronized (commandLock) {
-			if (command != null) {
-				logger.debug("sendCommand({}, {})", command, timeout);
-				output.write(command.getBytes());
-				output.write("\n".getBytes());
-			}
-			if (timeout == -1) {
-				commandLock.wait();
-			}
-			else {
-				commandLock.wait(timeout);
-			}
-		}
-		List<String> responses = drainResponseQueue();
-		return responses;
-	}
-	
-	//Serial receive thread
+	//Serial receive thread. Just reads lines and throws them in a queue.
 	public void run() {
+	    // Contains lines of multiline responses that are not yet complete.
+	    StringBuffer lineBuffer = new StringBuffer();
 		while (!disconnectRequested) {
 	        String line;
 	        try {
-	            line = readLine().trim();
+	            line = readLine();
 	        }
 	        catch (TimeoutException ex) {
 	            continue;
@@ -1146,26 +1209,21 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	            logger.error("Read error", e);
 	            return;
 	        }
-	        line = line.trim();
-			logger.debug(line);
-			responseQueue.offer(line);
-			//if (line.equals("ok") || line.startsWith("error: ")) {
-			if (line.isEmpty() == false) {
-				// This is the end of processing for a command
-				synchronized (commandLock) {
-					commandLock.notify();
-				}
+			logger.debug("'{}'", line);
+            lineBuffer.append(line);
+            // Look for the end of response token from FireStep
+			if (line.endsWith("} ")) {
+			    // If this is the end of a response we can package up
+			    // everything that has come before it and parse it.
+			    // TODO: handle parse failure error and indicate to the
+			    // controller that this has failed somehow
+			    JsonObject o = parser
+			            .parse(lineBuffer.toString())
+			            .getAsJsonObject();
+	            responseQueue.offer(o);
+                lineBuffer = new StringBuffer();
 			}
 		}
-	}
-	
-	private List<String> drainResponseQueue() {
-		List<String> responses = new ArrayList<String>();
-		String response;
-		while ((response = responseQueue.poll()) != null) {
-			responses.add(response);
-		}
-		return responses;
 	}
 	
 	public boolean isAutoUpdateToolOffsets() {
