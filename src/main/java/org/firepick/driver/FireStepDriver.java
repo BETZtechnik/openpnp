@@ -132,6 +132,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
 	private ReferenceHeadMountable lastToolUsed;
 	
+	@Attribute(required=false)
 	private boolean useFireStepKinematics = true;
 	
 	/*
@@ -273,7 +274,13 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         
         RawStepTriplet rs = deltaCalculator.getHomeRawSteps();
         if (useFireStepKinematics) {
-            sendJsonCommand(String.format("{'hom':''}"), 30000);
+            // find the smallest home angle step count
+            int hascMin = Math.min(rs.x, Math.min(rs.y, rs.z));
+//            sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}",
+//                    -hascMin,
+//                    -hascMin,
+//                    -hascMin), 10000);
+            sendJsonCommand(String.format("{'hom':''}"), 10000);
         }
         else {
             sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
@@ -284,7 +291,6 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
 	@Override
 	public Location getLocation(ReferenceHeadMountable hm) {
-		//TODO: Request raw step positions from FireStep, do forward delta kinematics, throw exception if they don't match this class's Cartesian pos.
 		return new Location(LengthUnit.Millimeters, x, y, z, c).add(hm.getHeadOffsets());
 	}
 	
@@ -589,22 +595,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         return deltaCalculator.getLocation(new RawStepTriplet(x, y, z));
 	}
 	
-	public List<Location> probeHex(ReferenceHeadMountable hm) throws Exception {
-//	    List<Location> locations = new ArrayList<Location>();
-//	    double radius = 50;
-//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0)));
-//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0)));
-//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(60)));
-//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(120)));
-//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(180)));
-//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(240)));
-//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, radius, 0, 0).rotateXy(300)));
-//        locations.add(probePoint(hm, new Location(LengthUnit.Millimeters, 0, 0, 0, 0)));
-//        return locations;
-	    throw new Exception("No!");
-	}
-
-    public List<Location> probeCorners(ReferenceHeadMountable hm) throws Exception {
+	public List<Location> probeCorners(ReferenceHeadMountable hm) throws Exception {
         Location startLocation = hm.getLocation();
         double distance = 85;
         List<Location> locations = new ArrayList<Location>();
@@ -1111,22 +1102,39 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             // bugs you.
             sendJsonCommand(String.format("{'dimst':%d}", (int) deltaCalculator.getStepsPerMotorRotation()));
             sendJsonCommand(String.format("{'dimmi':%d}", (int) deltaCalculator.getMotorMicrosteps()));
+
 //            sendJsonCommand(String.format("{'dimgr1':%f}", deltaCalculator.getPulleyReductionX()));
 //            sendJsonCommand(String.format("{'dimgr2':%f}", deltaCalculator.getPulleyReductionY()));
 //            sendJsonCommand(String.format("{'dimgr3':%f}", deltaCalculator.getPulleyReductionZ()));
+
             sendJsonCommand(String.format("{'dimgr':%f}",
                     (deltaCalculator.getPulleyReductionX() +
                     deltaCalculator.getPulleyReductionY() +
                     deltaCalculator.getPulleyReductionZ()) / 3
                     ));
+            
             sendJsonCommand(String.format("{'dime':%f}", deltaCalculator.getE()));
             sendJsonCommand(String.format("{'dimf':%f}", deltaCalculator.getF()));
             sendJsonCommand(String.format("{'dimre':%f}", deltaCalculator.getrE()));
             sendJsonCommand(String.format("{'dimrf':%f}", deltaCalculator.getrF()));
-//            sendJsonCommand(String.format("{'dimha':%f}", 0f));
-//            sendJsonCommand(String.format("{'xlb':%d}", (int) (deltaCalculator.getHomeRawSteps().x + 200)));
-//            sendJsonCommand(String.format("{'ylb':%d}", (int) (deltaCalculator.getHomeRawSteps().y + 200)));
-//            sendJsonCommand(String.format("{'zlb':%d}", (int) (deltaCalculator.getHomeRawSteps().z + 200)));
+//            sendJsonCommand(String.format("{'dimspa':%f}", 0f));
+            sendJsonCommand(String.format("{'dimspr':%f}", -0.38296));
+            sendJsonCommand(String.format("{'dimha':%f}", -69.544f));
+            /*
+             * When homing in MTO_FPD mode, FireStep requires that the home
+             * step counts all be the same. We want to use different ones so
+             * that we can zero the arms to horizontal, so we fake it by
+             * sending the difference as latch backoff and then using the
+             * min value when homing. The result is that homing to latch
+             * takes care of the differences between the three arms and then
+             * we home to zero. Since we tell FireStep the home angle is
+             * also zero, we have zeroed arms.
+             */
+            RawStepTriplet hasc = deltaCalculator.getHomeRawSteps();
+            int hascMin = Math.min(hasc.x, Math.min(hasc.y, hasc.z));
+            sendJsonCommand(String.format("{'xlb':%d}", (int) (200 + hasc.x - hascMin)));
+            sendJsonCommand(String.format("{'ylb':%d}", (int) (200 + hasc.y - hascMin)));
+            sendJsonCommand(String.format("{'zlb':%d}", (int) (200 + hasc.z - hascMin)));
         }
         else {
             sendJsonCommand("{'systo':0}");
