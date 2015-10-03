@@ -276,11 +276,17 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         if (useFireStepKinematics) {
             // find the smallest home angle step count
             int hascMin = Math.min(rs.x, Math.min(rs.y, rs.z));
+            
 //            sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}",
 //                    -hascMin,
 //                    -hascMin,
 //                    -hascMin), 10000);
+            
+//          sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
+
             sendJsonCommand(String.format("{'hom':''}"), 10000);
+            
+//          sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
         }
         else {
             sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
@@ -1117,9 +1123,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             sendJsonCommand(String.format("{'dimf':%f}", deltaCalculator.getF()));
             sendJsonCommand(String.format("{'dimre':%f}", deltaCalculator.getrE()));
             sendJsonCommand(String.format("{'dimrf':%f}", deltaCalculator.getrF()));
-//            sendJsonCommand(String.format("{'dimspa':%f}", 0f));
-            sendJsonCommand(String.format("{'dimspr':%f}", -0.38296));
-            sendJsonCommand(String.format("{'dimha':%f}", -69.544f));
+            sendJsonCommand(String.format("{'dimspr':%f}", 0f));
             /*
              * When homing in MTO_FPD mode, FireStep requires that the home
              * step counts all be the same. We want to use different ones so
@@ -1135,6 +1139,11 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             sendJsonCommand(String.format("{'xlb':%d}", (int) (200 + hasc.x - hascMin)));
             sendJsonCommand(String.format("{'ylb':%d}", (int) (200 + hasc.y - hascMin)));
             sendJsonCommand(String.format("{'zlb':%d}", (int) (200 + hasc.z - hascMin)));
+            
+            sendJsonCommand("{'dimha':''}");
+            sendJsonCommand(String.format("{'calho':%d}", -hascMin));
+//            sendJsonCommand(String.format("{'calho':''}"));
+            sendJsonCommand("{'dimha':''}");
         }
         else {
             sendJsonCommand("{'systo':0}");
@@ -1173,7 +1182,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             // double quotes. We need the double quotes so it will parse
             // correctly.
             command = command.replaceAll("'", "\"");
-            logger.debug("sendCommand({}, {})", command, timeout);
+            logger.trace("sendCommand({}, {})", command, timeout);
             output.write(command.getBytes());
             output.write("\n".getBytes());
         }
@@ -1193,11 +1202,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         // Check if any of the responses were failures.
         for (JsonObject o : responses) {
             if (o.has("s") && o.get("s").getAsInt() != 0) {
+                logger.error("{} => {}", command, responses);
                 throw new Exception("FireStep command failed " + o);
             }
         }
         
-        logger.debug("Responses: {}", responses);
+        logger.debug("{} => {}", command, responses);
         return responses;
 	}
 	
@@ -1217,7 +1227,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	            logger.error("Read error", e);
 	            return;
 	        }
-			logger.debug("'{}'", line);
+			logger.trace("'{}'", line);
             lineBuffer.append(line);
             // Look for the end of response token from FireStep
 			if (line.endsWith("} ")) {
