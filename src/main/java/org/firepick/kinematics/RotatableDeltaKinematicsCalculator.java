@@ -111,21 +111,21 @@ public class RotatableDeltaKinematicsCalculator {
      * the servo horn is horizontal with respect to the top plate.
      */
     @Attribute(required = false)
-    private int homeAngleStepsX = -5440;
+    private int homeAngleStepsX = 5440;
 
     /**
      * Number of steps required to move the Y motor off the home switch to where
      * the servo horn is horizontal with respect to the top plate.
      */
     @Attribute(required = false)
-    private int homeAngleStepsY = -5439;
+    private int homeAngleStepsY = 5440;
 
     /**
      * Number of steps required to move the Z motor off the home switch to where
      * the servo horn is horizontal with respect to the top plate.
      */
     @Attribute(required = false)
-    private int homeAngleStepsZ = -5503;
+    private int homeAngleStepsZ = 5440;
 
     @Attribute(required = false)
     private double stepsPerMotorRotation = 200.0;
@@ -134,13 +134,13 @@ public class RotatableDeltaKinematicsCalculator {
     private double motorMicrosteps = 16.0;
 
     @Attribute(required = false)
-    private double pulleyReductionX = 9.463324361;
+    private double pulleyReductionX = 9.459;
 
     @Attribute(required = false)
-    private double pulleyReductionY = 9.488866397;
+    private double pulleyReductionY = 9.459;
 
     @Attribute(required = false)
-    private double pulleyReductionZ = 9.428427757;
+    private double pulleyReductionZ = 9.459;
 
     @ElementList(required = false)
     private List<StepsToAngleMapping> stepsToAngleMappings = new ArrayList<StepsToAngleMapping>();
@@ -502,6 +502,30 @@ public class RotatableDeltaKinematicsCalculator {
 
     public void setPulleyReductionZ(double pulleyReductionZ) {
         this.pulleyReductionZ = pulleyReductionZ;
+    }
+    
+    public int getHomeAngleStepsX() {
+        return homeAngleStepsX;
+    }
+
+    public void setHomeAngleStepsX(int homeAngleStepsX) {
+        this.homeAngleStepsX = homeAngleStepsX;
+    }
+
+    public int getHomeAngleStepsY() {
+        return homeAngleStepsY;
+    }
+
+    public void setHomeAngleStepsY(int homeAngleStepsY) {
+        this.homeAngleStepsY = homeAngleStepsY;
+    }
+
+    public int getHomeAngleStepsZ() {
+        return homeAngleStepsZ;
+    }
+
+    public void setHomeAngleStepsZ(int homeAngleStepsZ) {
+        this.homeAngleStepsZ = homeAngleStepsZ;
     }
 
 

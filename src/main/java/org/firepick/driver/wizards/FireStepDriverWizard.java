@@ -42,8 +42,12 @@ import javax.swing.JTextPane;
 import javax.swing.border.TitledBorder;
 
 import org.firepick.driver.FireStepDriver;
+import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
 import org.openpnp.gui.MainFrame;
 import org.openpnp.gui.components.CameraView;
+import org.openpnp.gui.components.ComponentDecorators;
+import org.openpnp.gui.support.DoubleConverter;
+import org.openpnp.gui.support.IntegerConverter;
 import org.openpnp.gui.support.MessageBoxes;
 import org.openpnp.machine.reference.ReferenceHeadMountable;
 import org.openpnp.machine.reference.driver.wizards.AbstractSerialPortDriverConfigurationWizard;
@@ -57,9 +61,14 @@ import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
+
 import javax.swing.border.EtchedBorder;
+
 import java.awt.Color;
+
 import javax.swing.JTable;
+
+import java.awt.BorderLayout;
 
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
@@ -70,6 +79,114 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     public FireStepDriverWizard(FireStepDriver driver) {
         super(driver);
         this.driver = driver;
+        
+        JPanel panelDelta = new JPanel();
+        panelDelta.setBorder(new TitledBorder(null, "Delta Settings", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+        contentPanel.add(panelDelta);
+        panelDelta.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,}));
+        
+        JLabel lblUseFirestepKinematics = new JLabel("Use FireStep Kinematics?");
+        panelDelta.add(lblUseFirestepKinematics, "2, 2");
+        
+        checkBoxFireStepKinematics = new JCheckBox("");
+        panelDelta.add(checkBoxFireStepKinematics, "4, 2");
+        
+        JLabel lblEndEffectorArm = new JLabel("End Effector Arm Length");
+        panelDelta.add(lblEndEffectorArm, "2, 6");
+        
+        JLabel lblServoHornLength = new JLabel("Servo Horn Length");
+        panelDelta.add(lblServoHornLength, "4, 6");
+        
+        JLabel lblEndEffectorLength = new JLabel("End Effector Length");
+        panelDelta.add(lblEndEffectorLength, "6, 6");
+        
+        JLabel lblBaseLength = new JLabel("Base Length");
+        panelDelta.add(lblBaseLength, "8, 6");
+        
+        textFieldRe = new JTextField();
+        panelDelta.add(textFieldRe, "2, 8, fill, default");
+        textFieldRe.setColumns(10);
+        
+        textFieldRf = new JTextField();
+        panelDelta.add(textFieldRf, "4, 8, fill, default");
+        textFieldRf.setColumns(10);
+        
+        textFieldE = new JTextField();
+        panelDelta.add(textFieldE, "6, 8, fill, default");
+        textFieldE.setColumns(10);
+        
+        textFieldF = new JTextField();
+        panelDelta.add(textFieldF, "8, 8, fill, default");
+        textFieldF.setColumns(10);
+        
+        JLabel lblX = new JLabel("X");
+        panelDelta.add(lblX, "4, 12, center, default");
+        
+        JLabel lblY = new JLabel("Y");
+        panelDelta.add(lblY, "6, 12, center, default");
+        
+        JLabel lblZ = new JLabel("Z");
+        panelDelta.add(lblZ, "8, 12, center, default");
+        
+        JLabel lblHomeAngleStep = new JLabel("Home Angle Step Counts");
+        panelDelta.add(lblHomeAngleStep, "2, 14");
+        
+        textFieldHascX = new JTextField();
+        panelDelta.add(textFieldHascX, "4, 14, fill, default");
+        textFieldHascX.setColumns(10);
+        
+        textFieldHascY = new JTextField();
+        panelDelta.add(textFieldHascY, "6, 14, fill, default");
+        textFieldHascY.setColumns(10);
+        
+        textFieldHascZ = new JTextField();
+        panelDelta.add(textFieldHascZ, "8, 14, fill, default");
+        textFieldHascZ.setColumns(10);
+        
+        JButton btnReadHasc = new JButton(hascRead);
+        panelDelta.add(btnReadHasc, "10, 14");
+        
+        JLabel lblGearRatios = new JLabel("Gear Ratios");
+        panelDelta.add(lblGearRatios, "2, 16, right, default");
+        
+        textFieldGrX = new JTextField();
+        panelDelta.add(textFieldGrX, "4, 16, fill, default");
+        textFieldGrX.setColumns(10);
+        
+        textFieldGrY = new JTextField();
+        panelDelta.add(textFieldGrY, "6, 16, fill, default");
+        textFieldGrY.setColumns(10);
+        
+        textFieldGrZ = new JTextField();
+        panelDelta.add(textFieldGrZ, "8, 16, fill, default");
+        textFieldGrZ.setColumns(10);
         
         JPanel panelTools = new JPanel();
         panelTools.setBorder(new TitledBorder(null, "Tools", TitledBorder.LEADING, TitledBorder.TOP, null, null));
@@ -222,7 +339,35 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     @Override
     public void createBindings() {
         super.createBindings();
+        IntegerConverter intConverter = new IntegerConverter();
+        DoubleConverter doubleConverter = new DoubleConverter(Configuration.get().getLengthDisplayFormat());
+        RotatableDeltaKinematicsCalculator calc = driver.getDeltaCalculator();
+
+        addWrappedBinding(driver, "useFireStepKinematics", checkBoxFireStepKinematics, "selected");
+        
+        addWrappedBinding(calc, "e", textFieldE, "text", doubleConverter);
+        addWrappedBinding(calc, "f", textFieldF, "text", doubleConverter);
+        addWrappedBinding(calc, "rE", textFieldRe, "text", doubleConverter);
+        addWrappedBinding(calc, "rF", textFieldRf, "text", doubleConverter);
+        addWrappedBinding(calc, "pulleyReductionX", textFieldGrX, "text", doubleConverter);
+        addWrappedBinding(calc, "pulleyReductionY", textFieldGrY, "text", doubleConverter);
+        addWrappedBinding(calc, "pulleyReductionZ", textFieldGrZ, "text", doubleConverter);
+        addWrappedBinding(calc, "homeAngleStepsX", textFieldHascX, "text", intConverter);
+        addWrappedBinding(calc, "homeAngleStepsY", textFieldHascY, "text", intConverter);
+        addWrappedBinding(calc, "homeAngleStepsZ", textFieldHascZ, "text", intConverter);
+        
         addWrappedBinding(driver, "autoUpdateToolOffsets", chckbxAutoDetectTool, "selected");
+
+        ComponentDecorators.decorateWithAutoSelect(textFieldE);
+        ComponentDecorators.decorateWithAutoSelect(textFieldF);
+        ComponentDecorators.decorateWithAutoSelect(textFieldRe);
+        ComponentDecorators.decorateWithAutoSelect(textFieldRf);
+        ComponentDecorators.decorateWithAutoSelect(textFieldGrX);
+        ComponentDecorators.decorateWithAutoSelect(textFieldGrY);
+        ComponentDecorators.decorateWithAutoSelect(textFieldGrZ);
+        ComponentDecorators.decorateWithAutoSelect(textFieldHascX);
+        ComponentDecorators.decorateWithAutoSelect(textFieldHascY);
+        ComponentDecorators.decorateWithAutoSelect(textFieldHascZ);
     }
 
     @SuppressWarnings("serial")
@@ -372,6 +517,27 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         }
     };
     
+    @SuppressWarnings("serial")
+    private Action hascRead = new AbstractAction("Read") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            try {
+                List<JsonObject> responses = driver.sendJsonCommand("{'xpo':'','ypo':'','zpo':''}");
+                JsonObject response = responses.get(0).getAsJsonObject().get("r").getAsJsonObject();
+                int x = response.get("xpo").getAsInt();
+                int y = response.get("ypo").getAsInt();
+                int z = response.get("zpo").getAsInt();
+                textFieldHascX.setText("" + x);
+                textFieldHascY.setText("" + y);
+                textFieldHascZ.setText("" + z);
+            }
+            catch (Exception e1){
+                e1.printStackTrace();
+                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    };
+    
     private JTextField terminalCommandTextField;
     private JTextPane terminalLogTextPane;
     private JLabel labelFrontRight;
@@ -382,4 +548,15 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     private JTable tableBarycentric;
     private JLabel labelSingleProbeResults;
     private JTextPane textPaneZprobeDetailedResults;
+    private JTextField textFieldRe;
+    private JTextField textFieldRf;
+    private JTextField textFieldE;
+    private JTextField textFieldF;
+    private JTextField textFieldHascX;
+    private JTextField textFieldHascY;
+    private JTextField textFieldHascZ;
+    private JTextField textFieldGrX;
+    private JTextField textFieldGrY;
+    private JTextField textFieldGrZ;
+    private JCheckBox checkBoxFireStepKinematics;
 }

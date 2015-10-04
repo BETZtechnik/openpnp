@@ -208,6 +208,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 				setXyzMotorEnable(true);				// Enable power for XYZ stepper motors
 	    		enableEndEffectorRingLight(true); 		// Turn off down-looking LED ring light
 				Thread.sleep(50,0);                 	// Delay for a bit, wait for power supply to stabilize.
+		        setFireStepKinematicsEnabled(useFireStepKinematics);
 		        home(null);                         	// home the machine
 		        for (CarouselDriver carouselDriver : carouselDrivers) {
 		            carouselDriver.home();
@@ -277,19 +278,13 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             // find the smallest home angle step count
             int hascMin = Math.min(rs.x, Math.min(rs.y, rs.z));
             
-//            sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}",
-//                    -hascMin,
-//                    -hascMin,
-//                    -hascMin), 10000);
-            
-//          sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
-
-            sendJsonCommand(String.format("{'hom':''}"), 10000);
-            
-//          sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
+            sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}",
+                    -hascMin,
+                    -hascMin,
+                    -hascMin), 10000);
         }
         else {
-            sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", rs.x, rs.y, rs.z), 10000);
+            sendJsonCommand(String.format("{'hom':{'x':%d,'y':%d,'z':%d}}", -rs.x, -rs.y, -rs.z), 10000);
         }
         setLocation(getFireStepLocation());
         homed = true;
@@ -520,7 +515,6 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		
 	    //TODO: Allow configuration of modular tools 
 		setXyzMotorEnable(false);    // Disable all motors
-        setFireStepKinematicsEnabled(useFireStepKinematics);
         setMotorDirection(true, false, false); // Set X/Y motors to normal and rotation to inverted.
 		setHomingSpeed(200);				// Set the homing speed to something slower than default
 		sendJsonCommand("{'ape':34}"); // Set the enable pin for axis 'a' to tool 4 (this is an ugly hack and should go away)
@@ -1109,47 +1103,47 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             sendJsonCommand(String.format("{'dimst':%d}", (int) deltaCalculator.getStepsPerMotorRotation()));
             sendJsonCommand(String.format("{'dimmi':%d}", (int) deltaCalculator.getMotorMicrosteps()));
 
-//            sendJsonCommand(String.format("{'dimgr1':%f}", deltaCalculator.getPulleyReductionX()));
-//            sendJsonCommand(String.format("{'dimgr2':%f}", deltaCalculator.getPulleyReductionY()));
-//            sendJsonCommand(String.format("{'dimgr3':%f}", deltaCalculator.getPulleyReductionZ()));
-
-            sendJsonCommand(String.format("{'dimgr':%f}",
-                    (deltaCalculator.getPulleyReductionX() +
-                    deltaCalculator.getPulleyReductionY() +
-                    deltaCalculator.getPulleyReductionZ()) / 3
-                    ));
+            sendJsonCommand(String.format("{'dimgr1':%f}", deltaCalculator.getPulleyReductionX()));
+            sendJsonCommand(String.format("{'dimgr2':%f}", deltaCalculator.getPulleyReductionY()));
+            sendJsonCommand(String.format("{'dimgr3':%f}", deltaCalculator.getPulleyReductionZ()));
             
             sendJsonCommand(String.format("{'dime':%f}", deltaCalculator.getE()));
             sendJsonCommand(String.format("{'dimf':%f}", deltaCalculator.getF()));
             sendJsonCommand(String.format("{'dimre':%f}", deltaCalculator.getrE()));
             sendJsonCommand(String.format("{'dimrf':%f}", deltaCalculator.getrF()));
             sendJsonCommand(String.format("{'dimspr':%f}", 0f));
+            
             /*
              * When homing in MTO_FPD mode, FireStep requires that the home
              * step counts all be the same. We want to use different ones so
              * that we can zero the arms to horizontal, so we fake it by
              * sending the difference as latch backoff and then using the
-             * min value when homing. The result is that homing to latch
-             * takes care of the differences between the three arms and then
-             * we home to zero. Since we tell FireStep the home angle is
-             * also zero, we have zeroed arms.
+             * min value when homing. The addition of 200 is just so that we
+             * always have a minimum amount of latch backoff.             
              */
             RawStepTriplet hasc = deltaCalculator.getHomeRawSteps();
             int hascMin = Math.min(hasc.x, Math.min(hasc.y, hasc.z));
             sendJsonCommand(String.format("{'xlb':%d}", (int) (200 + hasc.x - hascMin)));
             sendJsonCommand(String.format("{'ylb':%d}", (int) (200 + hasc.y - hascMin)));
             sendJsonCommand(String.format("{'zlb':%d}", (int) (200 + hasc.z - hascMin)));
-            
-            sendJsonCommand("{'dimha':''}");
-            sendJsonCommand(String.format("{'calho':%d}", -hascMin));
-//            sendJsonCommand(String.format("{'calho':''}"));
-            sendJsonCommand("{'dimha':''}");
         }
         else {
             sendJsonCommand("{'systo':0}");
         }
     }
     
+    public boolean isUseFireStepKinematics() {
+        return useFireStepKinematics;
+    }
+
+    public void setUseFireStepKinematics(boolean useFireStepKinematics) {
+        this.useFireStepKinematics = useFireStepKinematics;
+    }
+
+    public RotatableDeltaKinematicsCalculator getDeltaCalculator() {
+        return deltaCalculator;
+    }
+
     /**
      * Send a command and wait 5 seconds for a response. This is just a
      * shortcut for {@link #sendJsonCommand(String, long)} with a default
