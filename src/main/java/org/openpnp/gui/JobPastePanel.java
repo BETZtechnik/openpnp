@@ -19,6 +19,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JToolBar;
 import javax.swing.ListSelectionModel;
+import javax.swing.border.LineBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -32,10 +33,11 @@ import org.openpnp.gui.support.MessageBoxes;
 import org.openpnp.gui.tablemodel.PadsTableModel;
 import org.openpnp.model.Board.Side;
 import org.openpnp.model.BoardLocation;
+import org.openpnp.model.BoardPad;
+import org.openpnp.model.BoardPad.Type;
 import org.openpnp.model.Configuration;
 import org.openpnp.model.Location;
 import org.openpnp.model.Pad;
-import org.openpnp.model.Pad.Type;
 import org.openpnp.spi.Camera;
 import org.openpnp.spi.PasteDispenser;
 import org.openpnp.util.MovableUtils;
@@ -50,6 +52,9 @@ public class JobPastePanel extends JPanel {
     private ActionGroup captureAndPositionActionGroup;
     private BoardLocation boardLocation;
 
+    private static Color typeColorIgnore = new Color(252, 255, 157);
+    private static Color typeColorPaste = new Color(157, 255, 168);
+    
     public JobPastePanel(JobPanel jobPanel) {
         Configuration configuration = Configuration.get();
         
@@ -134,8 +139,8 @@ public class JobPastePanel extends JPanel {
         JPopupMenu popupMenu = new JPopupMenu();
         
         JMenu setTypeMenu = new JMenu(setTypeAction);
-        setTypeMenu.add(new SetTypeAction(Pad.Type.Paste));
-        setTypeMenu.add(new SetTypeAction(Pad.Type.Ignore));
+        setTypeMenu.add(new SetTypeAction(BoardPad.Type.Paste));
+        setTypeMenu.add(new SetTypeAction(BoardPad.Type.Ignore));
         popupMenu.add(setTypeMenu);
 
         table.setComponentPopupMenu(popupMenu);                
@@ -156,16 +161,16 @@ public class JobPastePanel extends JPanel {
         }
     }
 
-    public Pad getSelection() {
-        List<Pad> selectedPads = getSelections();
+    public BoardPad getSelection() {
+        List<BoardPad> selectedPads = getSelections();
         if (selectedPads.isEmpty()) {
             return null;
         }
         return selectedPads.get(0);
     }
     
-    public List<Pad> getSelections() {
-        ArrayList<Pad> rows = new ArrayList<Pad>();
+    public List<BoardPad> getSelections() {
+        ArrayList<BoardPad> rows = new ArrayList<BoardPad>();
         if (boardLocation == null) {
             return rows;
         }
@@ -191,7 +196,8 @@ public class JobPastePanel extends JPanel {
             padClasses.add(Pad.RoundRectangle.class);
             padClasses.add(Pad.Circle.class);
             padClasses.add(Pad.Ellipse.class);
-            padClasses.add(Pad.Line.class);
+            // See note on Pad.Line
+//            padClasses.add(Pad.Line.class);
             ClassSelectionDialog<Pad> dialog = new ClassSelectionDialog<Pad>(
                     JOptionPane.getFrameForComponent(JobPastePanel.this),
                     "Select Pad...",
@@ -204,10 +210,12 @@ public class JobPastePanel extends JPanel {
             }
             try {
                 Pad pad = padClass.newInstance();
-                pad.setLocation(new Location(Configuration.get()
+                BoardPad boardPad = new BoardPad();
+                boardPad.setLocation(new Location(Configuration.get()
                         .getSystemUnits()));
+                boardPad.setPad(pad);
 
-                boardLocation.getBoard().addSolderPastePad(pad);
+                boardLocation.getBoard().addSolderPastePad(boardPad);
                 tableModel.fireTableDataChanged();
                 Helpers.selectLastTableRow(table);
             }
@@ -229,7 +237,7 @@ public class JobPastePanel extends JPanel {
 
         @Override
         public void actionPerformed(ActionEvent arg0) {
-            for (Pad pad : getSelections()) {
+            for (BoardPad pad : getSelections()) {
                 boardLocation.getBoard().removeSolderPastePad(pad);
             }
             tableModel.fireTableDataChanged();
@@ -319,9 +327,9 @@ public class JobPastePanel extends JPanel {
     };
     
     class SetTypeAction extends AbstractAction {
-        final Pad.Type type;
+        final BoardPad.Type type;
         
-        public SetTypeAction(Pad.Type type) {
+        public SetTypeAction(BoardPad.Type type) {
             this.type = type;
             putValue(NAME, type.toString());
             putValue(SHORT_DESCRIPTION, "Set pad type(s) to " + type.toString());
@@ -329,7 +337,7 @@ public class JobPastePanel extends JPanel {
 
         @Override
         public void actionPerformed(ActionEvent arg0) {
-            for (Pad pad : getSelections()) {
+            for (BoardPad pad : getSelections()) {
                 pad.setType(type);
             }
         }
@@ -340,10 +348,14 @@ public class JobPastePanel extends JPanel {
             Type type = (Type) value;
             setText(type.name());
             if (type == Type.Paste) {
-                setBackground(Color.cyan);
+                setBorder(new LineBorder(getBackground()));
+                setForeground(Color.black);
+                setBackground(typeColorPaste);
             }
             else if (type == Type.Ignore) {
-                setBackground(Color.yellow);
+                setBorder(new LineBorder(getBackground()));
+                setForeground(Color.black);
+                setBackground(typeColorIgnore);
             }
         }
     }

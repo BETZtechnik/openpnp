@@ -24,6 +24,8 @@ package org.openpnp.machine.reference;
 import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.io.Closeable;
+import java.io.IOException;
 
 import org.openpnp.ConfigurationListener;
 import org.openpnp.model.Configuration;
@@ -157,12 +159,16 @@ public abstract class ReferenceCamera extends AbstractCamera implements Referenc
         }
         return driver.getLocation(this);
     }
-    
+
     public double getSafeZ() {
     	return safeZ;
     }
     
     public void setSafeZ(double safeZ) { 
-    	this.safeZ = safeZ; 
+    	this.safeZ = safeZ;
+    }
+
+    @Override
+    public void close() throws IOException {
     }
 }
