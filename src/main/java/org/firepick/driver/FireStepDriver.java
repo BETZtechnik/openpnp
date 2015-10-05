@@ -35,6 +35,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -1273,14 +1274,30 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    
 	    @Commit
 	    private void commit() {
-	        System.out.println(map.size() + " of " + gridPoints.size() + " grid points are mapped.");
-	        for (Point point : gridPoints) {
-	            Location location = findClosest(point);
-	            Location idealLocation = startLocation.add(new Location(gridPointsUnits, point.getX(), point.getY(), 0, 0));
-	            if (location.getLinearDistanceTo(idealLocation) > 5) {
-	                System.out.println(point + " -> " + location);
-	            }
-	        }
+	        System.out.println(getUnmappedGridPoints());
+	    }
+	    
+	    public Location getPointMapping(Point point) {
+            double maxDistance = gridMinimumPointSeparation
+                    .convertToUnits(gridPointsUnits)
+                    .getValue();
+            Location location = findClosest(point);
+            Location idealLocation = startLocation.add(new Location(gridPointsUnits, point.getX(), point.getY(), 0, 0));
+            if (location.getLinearDistanceTo(idealLocation) <= maxDistance) {
+                return location;
+            }
+            return null;
+	    }
+	    
+	    public List<Point> getUnmappedGridPoints() {
+	        List<Point> points = new ArrayList<>();
+            for (Point point : gridPoints) {
+                Location location = getPointMapping(point);
+                if (location == null) {
+                    points.add(point);
+                }
+            }
+            return points;
 	    }
 	    
 	    public Location findClosest(Point point) {
