@@ -21,6 +21,7 @@ along with OpenPnP.  If not, see <http://www.gnu.org/licenses/>.
 
 package org.firepick.driver.wizards;
 
+import java.awt.Color;
 import java.awt.FlowLayout;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
@@ -37,23 +38,21 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
+import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
 
 import org.firepick.driver.FireStepDriver;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
-import org.openpnp.gui.MainFrame;
-import org.openpnp.gui.components.CameraView;
 import org.openpnp.gui.components.ComponentDecorators;
 import org.openpnp.gui.support.DoubleConverter;
 import org.openpnp.gui.support.IntegerConverter;
-import org.openpnp.gui.support.MessageBoxes;
 import org.openpnp.machine.reference.ReferenceHeadMountable;
 import org.openpnp.machine.reference.driver.wizards.AbstractSerialPortDriverConfigurationWizard;
 import org.openpnp.model.Configuration;
 import org.openpnp.model.Location;
-import org.openpnp.spi.HeadMountable;
 import org.openpnp.spi.Nozzle;
 
 import com.google.gson.JsonObject;
@@ -62,19 +61,10 @@ import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
 
-import javax.swing.border.EtchedBorder;
-
-import java.awt.Color;
-
-import javax.swing.JTable;
-
-import java.awt.BorderLayout;
-
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
     private List<String> history = new ArrayList<String>();
     private int historyIndex = 0;
-    private double barycentricCircleDiameter;
     
     public FireStepDriverWizard(FireStepDriver driver) {
         super(driver);
@@ -256,26 +246,17 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         contentPanel.add(panelCalibration);
         panelCalibration.setLayout(new FormLayout(new ColumnSpec[] {
                 FormFactory.RELATED_GAP_COLSPEC,
-                ColumnSpec.decode("default:grow"),},
+                FormFactory.DEFAULT_COLSPEC,},
             new RowSpec[] {
-                FormFactory.RELATED_GAP_ROWSPEC,
                 FormFactory.DEFAULT_ROWSPEC,
                 FormFactory.RELATED_GAP_ROWSPEC,
-                RowSpec.decode("100dlu"),}));
+                FormFactory.DEFAULT_ROWSPEC,}));
         
-        JPanel panel = new JPanel();
-        FlowLayout flowLayout = (FlowLayout) panel.getLayout();
-        flowLayout.setAlignment(FlowLayout.LEFT);
-        panelCalibration.add(panel, "2, 2, fill, fill");
+        chckbxEnableBarycentricInterpolation = new JCheckBox("Enable Barycentric Interpolation?");
+        panelCalibration.add(chckbxEnableBarycentricInterpolation, "2, 1");
         
         JButton btnGfilter = new JButton(barycentricCapture);
-        panel.add(btnGfilter);
-        
-        JScrollPane scrollPane = new JScrollPane();
-        panelCalibration.add(scrollPane, "2, 4, fill, fill");
-        
-        tableBarycentric = new JTable();
-        scrollPane.setViewportView(tableBarycentric);
+        panelCalibration.add(btnGfilter, "2, 3");
         
         JPanel panelBedLeveling = new JPanel();
         panelBedLeveling.setBorder(new TitledBorder(null, "Bed Leveling", TitledBorder.LEADING, TitledBorder.TOP, null, null));
@@ -300,6 +281,8 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
                 FormFactory.DEFAULT_ROWSPEC,
                 FormFactory.RELATED_GAP_ROWSPEC,
                 RowSpec.decode("default:grow"),
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
                 FormFactory.RELATED_GAP_ROWSPEC,
                 FormFactory.DEFAULT_ROWSPEC,
                 FormFactory.RELATED_GAP_ROWSPEC,
@@ -357,6 +340,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         addWrappedBinding(calc, "homeAngleStepsZ", textFieldHascZ, "text", intConverter);
         
         addWrappedBinding(driver, "autoUpdateToolOffsets", chckbxAutoDetectTool, "selected");
+        addWrappedBinding(driver.getBarycentricCalibration(), "enabled", chckbxEnableBarycentricInterpolation, "selected");
 
         ComponentDecorators.decorateWithAutoSelect(textFieldE);
         ComponentDecorators.decorateWithAutoSelect(textFieldF);
@@ -505,11 +489,18 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     };
     
     @SuppressWarnings("serial")
-    private Action barycentricCapture = new AbstractAction("Capture Barycentric") {
+    private Action barycentricCapture = new AbstractAction("Perform Barycentric Capture") {
         @Override
         public void actionPerformed(ActionEvent arg0) {
+            if (JOptionPane.showConfirmDialog(
+                    getTopLevelAncestor(), 
+                    "Make sure that you have the camera centered and focused over the center point of your calibration grid and then press Yes to start.", 
+                    "Start Barycentric Calibration?",
+                    JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                return;
+            }
             try {
-                driver.generateGfilter(barycentricCircleDiameter / 2);
+                driver.barycentricCapture();
             }
             catch (Exception e1){
                 JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -545,7 +536,6 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     private JLabel labelBackLeft;
     private JLabel labelBackRight;
     private JCheckBox chckbxAutoDetectTool;
-    private JTable tableBarycentric;
     private JLabel labelSingleProbeResults;
     private JTextPane textPaneZprobeDetailedResults;
     private JTextField textFieldRe;
@@ -559,4 +549,5 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     private JTextField textFieldGrY;
     private JTextField textFieldGrZ;
     private JCheckBox checkBoxFireStepKinematics;
+    private JCheckBox chckbxEnableBarycentricInterpolation;
 }

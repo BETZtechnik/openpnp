@@ -28,13 +28,13 @@ along with OpenPnP.  If not, see <http://www.gnu.org/licenses/>.
 package org.firepick.driver;
 
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -43,8 +43,6 @@ import javax.swing.Action;
 
 import org.firepick.driver.wizards.FireStepDriverWizard;
 import org.firepick.feeder.CarouselFeeder;
-import org.firepick.gfilter.GCoordinate;
-import org.firepick.gfilter.MappedPointFilter;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
 import org.firepick.model.RawStepTriplet;
 import org.firepick.vision.FireSight;
@@ -62,8 +60,10 @@ import org.openpnp.machine.reference.ReferenceNozzle;
 import org.openpnp.machine.reference.ReferencePasteDispenser;
 import org.openpnp.machine.reference.driver.AbstractSerialPortDriver;
 import org.openpnp.model.Configuration;
+import org.openpnp.model.Length;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
+import org.openpnp.model.Point;
 import org.openpnp.spi.Camera;
 import org.openpnp.spi.Head;
 import org.openpnp.spi.HeadMountable;
@@ -76,6 +76,8 @@ import org.openpnp.util.VisionUtils;
 import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.Element;
 import org.simpleframework.xml.ElementList;
+import org.simpleframework.xml.ElementMap;
+import org.simpleframework.xml.core.Commit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,19 +85,15 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.JsonPrimitive;
 
 
 public class FireStepDriver extends AbstractSerialPortDriver implements Runnable {
 	private static final Logger logger = LoggerFactory.getLogger(FireStepDriver.class);
 	private static final double minimumRequiredVersion = 1.0;
 	
-	//@Attribute
-	private double nozzleStepsPerDegree =  8.888888888;
-	private boolean nozzleEnabled = false;
-	private boolean powerSupplyOn = false;
 	@Element(required=false)
 	private boolean usePwmVacuum = false; // Intended to provide legacy support for older FireStep versions.. might remove this later.
+
 	@Element(required=false)
 	private int PwmVacuumSetting = 50;   // Provides a default value.  This might change later depending on whether we want to 
 	                                     // run the pump harder for larger parts (might depend on nozzle, part size, etc..).
@@ -106,23 +104,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Attribute(required=false)
 	private boolean autoUpdateToolOffsets = false;
 
-
-    private int rawFeedrate = 12800; //12800 is FireStep's default feedrate
-	private double x, y, z, c;
-	private Thread readerThread;
-	private boolean disconnectRequested;
-	private boolean connected;
-	private String connectedVersion;
-	private LinkedBlockingQueue<JsonObject> responseQueue = new LinkedBlockingQueue<>();
-	private JsonParser parser = new JsonParser();
-	
-	@Attribute(required=false)
-	private boolean useGfilter = false;
-    private MappedPointFilter gFilter;
-    
-    @Attribute(required=false)
-    private boolean useBarycentric = false;
-    private BarycentricInterpolation barycentric;
+    @Element(required=false)
+	private BarycentricCalibration barycentricCalibration = new BarycentricCalibration();
     
 	@ElementList(required=false)
 	private List<CarouselDriver> carouselDrivers = new ArrayList<CarouselDriver>();
@@ -130,11 +113,23 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Attribute(required=false)
 	private long dispenseTimeMilliseconds = 400;
 	
-	private ReferenceHeadMountable lastToolUsed;
-	
 	@Attribute(required=false)
 	private boolean useFireStepKinematics = true;
 	
+    private double nozzleStepsPerDegree =  8.888888888;
+    private boolean nozzleEnabled = false;
+    private boolean powerSupplyOn = false;
+    private BarycentricInterpolation barycentric;
+    private ReferenceHeadMountable lastToolUsed;
+    private int rawFeedrate = 12800; //12800 is FireStep's default feedrate
+    private double x, y, z, c;
+    private Thread readerThread;
+    private boolean disconnectRequested;
+    private boolean connected;
+    private String connectedVersion;
+    private LinkedBlockingQueue<JsonObject> responseQueue = new LinkedBlockingQueue<>();
+    private JsonParser parser = new JsonParser();
+    
 	/*
 	 * Stores whether or not the machine has been homed. If it has been homed
 	 * and we are disabling the machine, before homing again we move to zero
@@ -176,16 +171,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Override
 	public void setEnabled(boolean enabled) throws Exception {
 	    if (enabled) {
-            if (useGfilter) {
-                File file = new File(Configuration.get().getConfigurationDirectory(), "gfilter.json");
-                gFilter = new ConcreteMappedPointFilter(new FileReader(file));
-            }
-            else {
-                gFilter = null;
-            }
-            if (useBarycentric) {
-                File file = new File(Configuration.get().getConfigurationDirectory(), "barycentric.json");
-                barycentric = new BarycentricInterpolation(new FileReader(file));
+            if (barycentricCalibration.enabled) {
+                barycentric = new BarycentricInterpolation(barycentricCalibration.map);
             }
             else {
                 barycentric = null;
@@ -332,13 +319,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 Double.isNaN(location.getZ()) ? this.z : location.getZ(),
                 Double.isNaN(location.getRotation()) ? this.c : location.getRotation());
         Location scaledLocation = location.derive(null, null, null, null);
-        if (useGfilter) {
-            GCoordinate coord = new GCoordinate(scaledLocation.getX(), scaledLocation.getY(), scaledLocation.getZ());
-            GCoordinate mappedCoord = gFilter.interpolate(coord);
-            logger.debug("gFilter mapped: {} -> {} -> {}", new Object[] { scaledLocation, coord, mappedCoord });
-            scaledLocation = scaledLocation.derive(mappedCoord.getX(), mappedCoord.getY(), null, null);
-        }
-        if (useBarycentric) {
+        if (barycentricCalibration.enabled) {
             scaledLocation = barycentric.interpolate(scaledLocation);
         }
 	    
@@ -439,20 +420,6 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 ), 10000);
     }
     
-    public void moveToAngles(double x, double y, double z) throws Exception {
-        // TODO: need to open up getRawSteps or think of a good way to 
-        // move this into delta calcs.
-        throw new Exception("FireStepDriver: See TODO on moveToAngles");
-//        AngleTriplet angles = new AngleTriplet(x, y, z);
-//        RawStepTriplet steps = deltaCalculator.getRawSteps(angles);
-//        sendJsonCommand(String.format("{'mov':{'x':%d,'y':%d,'z':%d}}", 
-//                steps.x, 
-//                steps.y, 
-//                steps.z
-//                ), 10000);
-//        setLocation(getFireStepLocation());
-    }
-	
 	@Override
 	public void pick(ReferenceNozzle nozzle) throws Exception {
 		setRotMotorEnable(true); // Enable the nozzle rotation
@@ -675,35 +642,48 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         return bed_level;
     }
     
-    public void generateGfilter(final double radius) throws Exception {
-        final int gridX = 19, gridY = 19;
-        final double deltaX = 10, deltaY = 10;
+    boolean cancelBarycentricCapture = false;
+    public void barycentricCapture() throws Exception {
         final int numTries = 10;
         final double maxErrorDistance = 5;
         final double minErrorDistance = 0.1;
-        /*
-         * Assume the current position is the start position, which is 0,0.
-         * We will use the start position's Z for the entire operation.
-         * We will cover a grid of X by Y at a certain increment.
-         */
+        final Map<Location, Location> map = new LinkedHashMap<>();
         MainFrame.machineControlsPanel.submitMachineTask(new Runnable() {
             @Override
             public void run() {
-                JsonArray points = new JsonArray();
-                JsonObject map = new JsonObject();
-                map.add("map", points);
                 ReferenceCamera camera = (ReferenceCamera) Configuration.get().getMachine().getHeads().get(0).getCameras().get(0);
                 Location startLocation = camera.getLocation();
-                try {
-                    List<Location> locations = new ArrayList<>();
-                    for (int y = -gridY / 2; y <= gridY / 2; y++) {
-                        for (int x = -gridX / 2; x <= gridX / 2; x++) {
-                            Location location = startLocation.add(new Location(LengthUnit.Millimeters, x * deltaX, y * deltaY, 0, 0));
-                            locations.add(location);
-                        }
-                    }
 
-                    for (Location location : locations) {
+                Location unitsPerPixel = camera
+                        .getUnitsPerPixel()
+                        .convertToUnits(barycentricCalibration.gridCircleDiameter.getUnits());
+                double uppMin = Math.min(unitsPerPixel.getX(), unitsPerPixel.getY());
+                double uppMax = Math.max(unitsPerPixel.getX(), unitsPerPixel.getY());
+                double uppAverage = (uppMin + uppMax) / 2;
+                double radiusMin = barycentricCalibration
+                        .gridCircleDiameter
+                        .getValue() / uppMin / 2;
+                double radiusMax = barycentricCalibration
+                        .gridCircleDiameter
+                        .getValue() / uppMax / 2;
+                // Add 5% to each radius to account for mumble, mumble, mumble. Just trust me.
+                radiusMin -= radiusMin * 0.05;
+                radiusMax += radiusMax * 0.05;
+                double minimumDistance = barycentricCalibration.gridMinimumPointSeparation.getValue() / uppAverage; 
+                
+                try {
+                    for (Point point : barycentricCalibration.gridPoints) {
+                        if (cancelBarycentricCapture) {
+                            return;
+                        }
+                        Location location = new Location(
+                                barycentricCalibration.gridPointsUnits,
+                                point.getX(), 
+                                point.getY(), 
+                                0, 
+                                0);
+                        location = startLocation.add(location.convertToUnits(startLocation.getUnits()));
+                        
                         Location visionLocation = location;
                         boolean found = false;
                         for (int i = 0; i < numTries; i++) {
@@ -713,8 +693,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                             // wait a tick
                             Thread.sleep(1000);
                             
-                            // find the circle
-                            List<Location> circles = findCircles(camera, radius - 5, radius + 5, 100);
+                            List<Location> circles = findCircles(camera, radiusMin, radiusMax, minimumDistance);
                             Location visionLocation2 = null;
                             if (!circles.isEmpty()) {
                                 visionLocation2 = circles.get(0);
@@ -745,6 +724,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                             // Update the running location with the new one
                             visionLocation = visionLocation2;
                             
+                            // Zero out the rotation since circles don't rotate.
+                            visionLocation = visionLocation.derive(null, null, null, 0d);
+                            
                             // If we moved less than 0.1 to find the new location then we're probably
                             // just circling the ideal, so call it good
                             if (distance < minErrorDistance) {
@@ -764,17 +746,17 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                             logger.warn("FAILED {} {}", location, location.subtract(startLocation));
                         }
                         else {
-                            location = location.subtract(camera.getHeadOffsets());
-                            visionLocation = visionLocation.subtract(camera.getHeadOffsets());
                             logger.debug("{} -> {} -> {}", location, visionLocation);
-                            addDomainAndRange(points, location, visionLocation);
+                            map.put(location, visionLocation);
                         }
                     }
+                    camera.moveTo(startLocation, 1.0);
                 }
                 catch (Exception e) {
                     e.printStackTrace();
                 }
-                logger.info(map.toString());
+                barycentricCalibration.map.clear();
+                barycentricCalibration.map.putAll(map);
             }
         });
     }
@@ -943,6 +925,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         JsonObject s1 = pipeline.get(0).getAsJsonObject();
         s1.addProperty("diamMin", minRadius * 2);
         s1.addProperty("diamMax", maxRadius * 2);
+        s1.addProperty("houghcircles_minDist", minDistance);
         BufferedImage image = camera.capture();
         FireSightResult result = FireSight.fireSight(image, pipeline);
         List<Location> locations = new ArrayList<>();
@@ -963,25 +946,6 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             }
         });
         return locations;
-    }
-    
-    private void addDomainAndRange(JsonArray points, Location location, Location visionLocation) {
-        JsonArray domain;
-        JsonArray range;
-        JsonObject o;
-        
-        o = new JsonObject();
-        domain = new JsonArray();
-        range = new JsonArray();
-        domain.add(new JsonPrimitive(location.getX()));
-        domain.add(new JsonPrimitive(location.getY()));
-        domain.add(new JsonPrimitive(location.getZ()));
-        range.add(new JsonPrimitive(visionLocation.getX()));
-        range.add(new JsonPrimitive(visionLocation.getY()));
-        range.add(new JsonPrimitive(visionLocation.getZ()));
-        o.add("domain", domain);
-        o.add("range", range);
-        points.add(o);
     }
     
 	private void setMotorDirection(boolean xyz, boolean rot, boolean enable) throws Exception {
@@ -1112,6 +1076,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             sendJsonCommand(String.format("{'dimre':%f}", deltaCalculator.getrE()));
             sendJsonCommand(String.format("{'dimrf':%f}", deltaCalculator.getrF()));
             sendJsonCommand(String.format("{'dimspr':%f}", 0f));
+            sendJsonCommand(String.format("{'dimhz':%f}", 32f));
             
             /*
              * When homing in MTO_FPD mode, FireStep requires that the home
@@ -1273,5 +1238,110 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    return new PropertySheet[] {
 	            new PropertySheetWizardAdapter(getConfigurationWizard())
 	    };
+	}
+	
+	public BarycentricCalibration getBarycentricCalibration() {
+        return barycentricCalibration;
+    }
+
+    public void setBarycentricCalibration(
+            BarycentricCalibration barycentricCalibration) {
+        this.barycentricCalibration = barycentricCalibration;
+    }
+
+    public static class BarycentricCalibration {
+        @Attribute
+        private boolean enabled;
+        
+	    @Element
+	    private Length gridCircleDiameter = new Length(3.5, LengthUnit.Millimeters);
+	    
+	    @Attribute
+	    private LengthUnit gridPointsUnits = LengthUnit.Millimeters;
+	    
+	    @ElementList
+	    private List<Point> gridPoints = new ArrayList<>();
+	    
+	    @Element
+	    private Length gridMinimumPointSeparation = new Length(8, LengthUnit.Millimeters);
+	    
+	    @ElementMap
+	    private Map<Location, Location> map = new LinkedHashMap<>();
+	    
+	    @Element
+	    private Location startLocation = new Location(LengthUnit.Millimeters);
+	    
+	    @Commit
+	    private void commit() {
+	        System.out.println(map.size() + " of " + gridPoints.size() + " grid points are mapped.");
+	        for (Point point : gridPoints) {
+	            Location location = findClosest(point);
+	            Location idealLocation = startLocation.add(new Location(gridPointsUnits, point.getX(), point.getY(), 0, 0));
+	            if (location.getLinearDistanceTo(idealLocation) > 5) {
+	                System.out.println(point + " -> " + location);
+	            }
+	        }
+	    }
+	    
+	    public Location findClosest(Point point) {
+            double minDistance = Double.MAX_VALUE;
+            Location minLocation = null;
+            for (Location location : map.keySet()) {
+                double distance = location.subtract(startLocation).getLinearDistanceTo(point.getX(), point.getY());
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    minLocation = location;
+                }
+            }
+            return minLocation;
+	    }
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Length getGridCircleDiameter() {
+            return gridCircleDiameter;
+        }
+
+        public void setGridCircleDiameter(Length gridCircleDiameter) {
+            this.gridCircleDiameter = gridCircleDiameter;
+        }
+
+        public LengthUnit getGridPointsUnits() {
+            return gridPointsUnits;
+        }
+
+        public void setGridPointsUnits(LengthUnit gridPointsUnits) {
+            this.gridPointsUnits = gridPointsUnits;
+        }
+
+        public List<Point> getGridPoints() {
+            return gridPoints;
+        }
+
+        public void setGridPoints(List<Point> gridPoints) {
+            this.gridPoints = gridPoints;
+        }
+
+        public Length getGridMinimumPointSeparation() {
+            return gridMinimumPointSeparation;
+        }
+
+        public void setGridMinimumPointSeparation(Length gridMinimumPointSeparation) {
+            this.gridMinimumPointSeparation = gridMinimumPointSeparation;
+        }
+
+        public Map<Location, Location> getMap() {
+            return map;
+        }
+
+        public void setMap(Map<Location, Location> map) {
+            this.map = map;
+        }
 	}
 }

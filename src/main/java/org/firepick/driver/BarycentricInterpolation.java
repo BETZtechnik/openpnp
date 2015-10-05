@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
@@ -31,6 +32,10 @@ public class BarycentricInterpolation {
     private static final Logger logger = LoggerFactory.getLogger(BarycentricInterpolation.class);
     private Map<Point2D.Double, Point2D.Double> map = new HashMap<>();
     
+    public BarycentricInterpolation() {
+        
+    }
+    
     /**
      * Create an interpolator by parsing a gfilter style mapping from the
      * reader.
@@ -49,8 +54,14 @@ public class BarycentricInterpolation {
         }
     }
     
-    public BarycentricInterpolation() {
-        
+    public BarycentricInterpolation(Map<Location, Location> map) {
+        for (Entry<Location, Location> entry : map.entrySet()) {
+            Location domain = entry.getKey();
+            Location range = entry.getValue();
+            this.map.put(
+                    new Point2D.Double(domain.getX(), domain.getY()), 
+                    new Point2D.Double(range.getX(), range.getY()));
+        }
     }
     
     public void addPoint(Point2D.Double domain, Point2D.Double range) {
