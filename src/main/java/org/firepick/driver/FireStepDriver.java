@@ -35,13 +35,14 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.Action;
 
+import org.firepick.driver.FireStepDriver.BarycentricCalibration.DomainAndRange;
 import org.firepick.driver.wizards.FireStepDriverWizard;
 import org.firepick.feeder.CarouselFeeder;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
@@ -173,7 +174,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	public void setEnabled(boolean enabled) throws Exception {
 	    if (enabled) {
             if (barycentricCalibration.enabled) {
-                barycentric = new BarycentricInterpolation(barycentricCalibration.map);
+                barycentric = new BarycentricInterpolation(barycentricCalibration.getMap());
             }
             else {
                 barycentric = null;
@@ -643,17 +644,16 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         return bed_level;
     }
     
-    boolean cancelBarycentricCapture = false;
-    public void barycentricCapture() throws Exception {
+    public void barycentricCapture(final boolean unmappedOnly) throws Exception {
         final int numTries = 10;
         final double maxErrorDistance = 5;
         final double minErrorDistance = 0.1;
-        final Map<Location, Location> map = new LinkedHashMap<>();
+        final Map<Point, DomainAndRange> map = new LinkedHashMap<>();
         MainFrame.machineControlsPanel.submitMachineTask(new Runnable() {
             @Override
             public void run() {
                 ReferenceCamera camera = (ReferenceCamera) Configuration.get().getMachine().getHeads().get(0).getCameras().get(0);
-                Location startLocation = camera.getLocation();
+                Location startLocation = unmappedOnly ? barycentricCalibration.startLocation : camera.getLocation();
 
                 Location unitsPerPixel = camera
                         .getUnitsPerPixel()
@@ -673,10 +673,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 double minimumDistance = barycentricCalibration.gridMinimumPointSeparation.getValue() / uppAverage; 
                 
                 try {
-                    for (Point point : barycentricCalibration.gridPoints) {
-                        if (cancelBarycentricCapture) {
-                            return;
-                        }
+                    int pointsChecked = 0;
+                    List<Point> points = unmappedOnly ? 
+                            barycentricCalibration.getUnmappedGridPoints() 
+                            : barycentricCalibration.gridPoints;
+                    for (Point point : points) {
+                        logger.info("Checking {} of {} points.", ++pointsChecked, points.size());
                         Location location = new Location(
                                 barycentricCalibration.gridPointsUnits,
                                 point.getX(), 
@@ -748,7 +750,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                         }
                         else {
                             logger.debug("{} -> {} -> {}", location, visionLocation);
-                            map.put(location, visionLocation);
+                            map.put(point, new DomainAndRange(location, visionLocation));
                         }
                     }
                     camera.moveTo(startLocation, 1.0);
@@ -756,8 +758,11 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 catch (Exception e) {
                     e.printStackTrace();
                 }
-                barycentricCalibration.map.clear();
-                barycentricCalibration.map.putAll(map);
+                if (!unmappedOnly) {
+                    barycentricCalibration.getMappedGridPoints().clear();
+                }
+                barycentricCalibration.getMappedGridPoints().putAll(map);
+                barycentricCalibration.startLocation = startLocation;
             }
         });
     }
@@ -1266,51 +1271,34 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    @Element
 	    private Length gridMinimumPointSeparation = new Length(8, LengthUnit.Millimeters);
 	    
-	    @ElementMap
-	    private Map<Location, Location> map = new LinkedHashMap<>();
-	    
 	    @Element
 	    private Location startLocation = new Location(LengthUnit.Millimeters);
 	    
-	    @Commit
-	    private void commit() {
-	        System.out.println(getUnmappedGridPoints());
-	    }
-	    
-	    public Location getPointMapping(Point point) {
-            double maxDistance = gridMinimumPointSeparation
-                    .convertToUnits(gridPointsUnits)
-                    .getValue();
-            Location location = findClosest(point);
-            Location idealLocation = startLocation.add(new Location(gridPointsUnits, point.getX(), point.getY(), 0, 0));
-            if (location.getLinearDistanceTo(idealLocation) <= maxDistance) {
-                return location;
+        @ElementMap(required=false)
+        private Map<Point, DomainAndRange> mappedPoints = new LinkedHashMap<>();
+        
+        @Commit
+        private void commit() {
+            logger.info("BarycentricCalibration: {} unmapped points.", getUnmappedGridPoints().size());
+        }
+        
+        public Map<Location, Location> getMap() {
+            Map<Location, Location> map = new LinkedHashMap<Location, Location>();
+            for (DomainAndRange o : mappedPoints.values()) {
+                map.put(o.domain, o.range);
             }
-            return null;
-	    }
-	    
+            return map;
+        }
+
 	    public List<Point> getUnmappedGridPoints() {
-	        List<Point> points = new ArrayList<>();
-            for (Point point : gridPoints) {
-                Location location = getPointMapping(point);
-                if (location == null) {
-                    points.add(point);
-                }
-            }
-            return points;
+	        List<Point> gridPoints = new ArrayList<>(this.gridPoints);
+            Set<Point> mappedPoints = this.mappedPoints.keySet();
+	        gridPoints.removeAll(mappedPoints);
+	        return gridPoints;
 	    }
 	    
-	    public Location findClosest(Point point) {
-            double minDistance = Double.MAX_VALUE;
-            Location minLocation = null;
-            for (Location location : map.keySet()) {
-                double distance = location.subtract(startLocation).getLinearDistanceTo(point.getX(), point.getY());
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    minLocation = location;
-                }
-            }
-            return minLocation;
+	    public Map<Point, DomainAndRange> getMappedGridPoints() {
+	        return mappedPoints;
 	    }
 
         public boolean isEnabled() {
@@ -1352,13 +1340,21 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         public void setGridMinimumPointSeparation(Length gridMinimumPointSeparation) {
             this.gridMinimumPointSeparation = gridMinimumPointSeparation;
         }
-
-        public Map<Location, Location> getMap() {
-            return map;
-        }
-
-        public void setMap(Map<Location, Location> map) {
-            this.map = map;
+        
+        public static class DomainAndRange {
+            @Element
+            Location domain;
+            @Element
+            Location range;
+            
+            public DomainAndRange() {
+                
+            }
+            
+            public DomainAndRange(Location domain, Location range) {
+                this.domain = domain;
+                this.range = range;
+            }
         }
 	}
 }

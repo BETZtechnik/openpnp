@@ -49,6 +49,7 @@ import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
 import org.openpnp.gui.components.ComponentDecorators;
 import org.openpnp.gui.support.DoubleConverter;
 import org.openpnp.gui.support.IntegerConverter;
+import org.openpnp.gui.support.MessageBoxes;
 import org.openpnp.machine.reference.ReferenceHeadMountable;
 import org.openpnp.machine.reference.driver.wizards.AbstractSerialPortDriverConfigurationWizard;
 import org.openpnp.model.Configuration;
@@ -246,6 +247,8 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         contentPanel.add(panelCalibration);
         panelCalibration.setLayout(new FormLayout(new ColumnSpec[] {
                 FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
                 FormFactory.DEFAULT_COLSPEC,},
             new RowSpec[] {
                 FormFactory.DEFAULT_ROWSPEC,
@@ -255,8 +258,11 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         chckbxEnableBarycentricInterpolation = new JCheckBox("Enable Barycentric Interpolation?");
         panelCalibration.add(chckbxEnableBarycentricInterpolation, "2, 1");
         
-        JButton btnGfilter = new JButton(barycentricCapture);
+        JButton btnGfilter = new JButton(barycentricCaptureFull);
         panelCalibration.add(btnGfilter, "2, 3");
+        
+        JButton btnNewButton = new JButton(barycentricCaptureUnmapped);
+        panelCalibration.add(btnNewButton, "4, 3");
         
         JPanel panelBedLeveling = new JPanel();
         panelBedLeveling.setBorder(new TitledBorder(null, "Bed Leveling", TitledBorder.LEADING, TitledBorder.TOP, null, null));
@@ -489,18 +495,58 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     };
     
     @SuppressWarnings("serial")
-    private Action barycentricCapture = new AbstractAction("Perform Barycentric Capture") {
+    private Action barycentricCaptureFull = new AbstractAction("Barycentric Capture (Full)") {
         @Override
         public void actionPerformed(ActionEvent arg0) {
+            if (driver.getBarycentricCalibration().isEnabled()) {
+                MessageBoxes.errorBox(getTopLevelAncestor(), "Error", "You can not perform Barycentric Capture with Barycentric Interpolation enabled. Please disable it and reset the machine before continuing.");
+                return;
+            }
             if (JOptionPane.showConfirmDialog(
                     getTopLevelAncestor(), 
-                    "Make sure that you have the camera centered and focused over the center point of your calibration grid and then press Yes to start.", 
-                    "Start Barycentric Calibration?",
+                    "Make sure that you have the camera centered and focused\r\nover the center point of your calibration grid and then press Yes to start.", 
+                    "Start Barycentric Capture (Full)?",
                     JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
                 return;
             }
             try {
-                driver.barycentricCapture();
+                driver.barycentricCapture(false);
+            }
+            catch (Exception e1){
+                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    };
+    
+    @SuppressWarnings("serial")
+    private Action barycentricCaptureUnmapped = new AbstractAction("Barycentric Capture (Unmapped)") {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            if (driver.getBarycentricCalibration().isEnabled()) {
+                MessageBoxes.errorBox(getTopLevelAncestor(), "Error", "You can not perform Barycentric Capture with Barycentric Interpolation enabled. Please disable it and reset the machine before continuing.");
+                return;
+            }
+            if (driver.getBarycentricCalibration().getMappedGridPoints().isEmpty()) {
+                MessageBoxes.errorBox(getTopLevelAncestor(), "Error", "You have not yet performed a Full Barycentric Capture. Please do that first.");
+                return;
+            }
+            if (driver.getBarycentricCalibration().getUnmappedGridPoints().isEmpty()) {
+                MessageBoxes.errorBox(getTopLevelAncestor(), "Error", "All points are mapped. Nothing to do.");
+                return;
+            }
+            if (JOptionPane.showConfirmDialog(
+                    getTopLevelAncestor(), 
+                    "This calibration will capture only the points that failed\r\n" +
+                    "during the last Full Barycentric Capture. Make sure your calibration\r\n" +
+                    "grid has not moved since the last Full Barycentric Capture.\r\n\r\n" +
+                    "If it has moved, you should do a Full Barycentric Capture instead.\r\n\r\n" +
+                    "Ready to start?", 
+                    "Start Barycentric Capture (Unmapped)?",
+                    JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                return;
+            }
+            try {
+                driver.barycentricCapture(true);
             }
             catch (Exception e1){
                 JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
