@@ -340,6 +340,19 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         LocationButtonsPanel locationButtonsPanelCamPoseBottom = new LocationButtonsPanel(textFieldCamPoseBottomX, textFieldCamPoseBottomY, textFieldCamPoseBottomZ, null);
         panelCameraPose.add(locationButtonsPanelCamPoseBottom, "10, 8, left, default");
         
+        JPanel panelTools = new JPanel();
+        panelTools.setBorder(new TitledBorder(null, "Tools", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+        contentPanel.add(panelTools);
+        panelTools.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,}));
+        
+        chckbxAutoDetectTool = new JCheckBox("Auto Detect Tool Offsets on First Move (EXPERIMENTAL)");
+        panelTools.add(chckbxAutoDetectTool, "2, 2");
+        
         JPanel panelTerminal = new JPanel();
         panelTerminal.setBorder(new TitledBorder(new EtchedBorder(EtchedBorder.LOWERED, null, null), "FireStep Terminal", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
         contentPanel.add(panelTerminal);
@@ -387,19 +400,6 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         
         terminalLogTextPane = new JTextPane();
         scrollPane_1.setViewportView(terminalLogTextPane);
-        
-        JPanel panelTools = new JPanel();
-        panelTools.setBorder(new TitledBorder(null, "Tools", TitledBorder.LEADING, TitledBorder.TOP, null, null));
-        contentPanel.add(panelTools);
-        panelTools.setLayout(new FormLayout(new ColumnSpec[] {
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,},
-            new RowSpec[] {
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,}));
-        
-        chckbxAutoDetectTool = new JCheckBox("Auto Detect Tool Offsets on First Move (EXPERIMENTAL)");
-        panelTools.add(chckbxAutoDetectTool, "2, 2");
     }
  
     @Override
