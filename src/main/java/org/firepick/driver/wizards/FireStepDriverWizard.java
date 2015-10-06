@@ -46,10 +46,13 @@ import javax.swing.border.TitledBorder;
 
 import org.firepick.driver.FireStepDriver;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
+import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
 import org.openpnp.gui.components.ComponentDecorators;
 import org.openpnp.gui.support.DoubleConverter;
 import org.openpnp.gui.support.IntegerConverter;
+import org.openpnp.gui.support.LengthConverter;
 import org.openpnp.gui.support.MessageBoxes;
+import org.openpnp.gui.support.MutableLocationProxy;
 import org.openpnp.machine.reference.ReferenceHeadMountable;
 import org.openpnp.machine.reference.driver.wizards.AbstractSerialPortDriverConfigurationWizard;
 import org.openpnp.model.Configuration;
@@ -61,6 +64,8 @@ import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
+
+import org.openpnp.gui.components.LocationButtonsPanel;
 
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
@@ -179,91 +184,6 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         panelDelta.add(textFieldGrZ, "8, 16, fill, default");
         textFieldGrZ.setColumns(10);
         
-        JPanel panelTools = new JPanel();
-        panelTools.setBorder(new TitledBorder(null, "Tools", TitledBorder.LEADING, TitledBorder.TOP, null, null));
-        contentPanel.add(panelTools);
-        panelTools.setLayout(new FormLayout(new ColumnSpec[] {
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,},
-            new RowSpec[] {
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,}));
-        
-        chckbxAutoDetectTool = new JCheckBox("Auto Detect Tool Offsets on First Move (EXPERIMENTAL)");
-        panelTools.add(chckbxAutoDetectTool, "2, 2");
-        
-        JPanel panelTerminal = new JPanel();
-        panelTerminal.setBorder(new TitledBorder(new EtchedBorder(EtchedBorder.LOWERED, null, null), "FireStep Terminal", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
-        contentPanel.add(panelTerminal);
-        panelTerminal.setLayout(new FormLayout(new ColumnSpec[] {
-                FormFactory.RELATED_GAP_COLSPEC,
-                ColumnSpec.decode("default:grow"),
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,},
-            new RowSpec[] {
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,
-                FormFactory.RELATED_GAP_ROWSPEC,
-                RowSpec.decode("100dlu"),}));
-        
-        terminalCommandTextField = new JTextField();
-        panelTerminal.add(terminalCommandTextField, "2, 2, fill, default");
-        terminalCommandTextField.setColumns(10);
-        terminalCommandTextField.setAction(terminalSend);
-        terminalCommandTextField.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyReleased(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_UP) {
-                    if (++historyIndex >= history.size()) {
-                        historyIndex = history.size() - 1;
-                    }
-                    terminalCommandTextField.setText(history.get(historyIndex));
-                }
-                else if (e.getKeyCode() == KeyEvent.VK_DOWN) {
-                    if (--historyIndex < 0) {
-                        historyIndex = 0;
-                    }
-                    terminalCommandTextField.setText(history.get(historyIndex));
-                }
-                else {
-                    super.keyTyped(e);
-                }
-            }
-        });
-        
-        JButton btnSend = new JButton(terminalSend);
-        panelTerminal.add(btnSend, "4, 2");
-        
-        JScrollPane scrollPane_1 = new JScrollPane();
-        panelTerminal.add(scrollPane_1, "2, 4, 3, 1, fill, fill");
-        
-        terminalLogTextPane = new JTextPane();
-        scrollPane_1.setViewportView(terminalLogTextPane);
-        
-        //Setup panel
-        JPanel panelCalibration = new JPanel();
-        panelCalibration.setBorder(new TitledBorder(null, "Calibration", TitledBorder.LEADING, TitledBorder.TOP, null, null));
-        contentPanel.add(panelCalibration);
-        contentPanel.add(panelCalibration);
-        panelCalibration.setLayout(new FormLayout(new ColumnSpec[] {
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,},
-            new RowSpec[] {
-                FormFactory.DEFAULT_ROWSPEC,
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,}));
-        
-        chckbxEnableBarycentricInterpolation = new JCheckBox("Enable Barycentric Interpolation?");
-        panelCalibration.add(chckbxEnableBarycentricInterpolation, "2, 1");
-        
-        JButton btnGfilter = new JButton(barycentricCaptureFull);
-        panelCalibration.add(btnGfilter, "2, 3");
-        
-        JButton btnNewButton = new JButton(barycentricCaptureUnmapped);
-        panelCalibration.add(btnNewButton, "4, 3");
-        
         JPanel panelBedLeveling = new JPanel();
         panelBedLeveling.setBorder(new TitledBorder(null, "Bed Leveling", TitledBorder.LEADING, TitledBorder.TOP, null, null));
         contentPanel.add(panelBedLeveling);
@@ -323,11 +243,169 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         
         labelFrontRight = new JLabel("100.000");
         panelBedLeveling.add(labelFrontRight, "6, 8");
+        
+        //Setup panel
+        JPanel panelBarycentricCalibration = new JPanel();
+        panelBarycentricCalibration.setBorder(new TitledBorder(new EtchedBorder(EtchedBorder.LOWERED, null, null), "Barycentric Calibration", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
+        contentPanel.add(panelBarycentricCalibration);
+        contentPanel.add(panelBarycentricCalibration);
+        panelBarycentricCalibration.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,},
+            new RowSpec[] {
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,}));
+        
+        chckbxEnableBarycentricInterpolation = new JCheckBox("Enable Barycentric Interpolation?");
+        panelBarycentricCalibration.add(chckbxEnableBarycentricInterpolation, "2, 1");
+        
+        JButton btnGfilter = new JButton(barycentricCaptureFull);
+        panelBarycentricCalibration.add(btnGfilter, "2, 3");
+        
+        JButton btnNewButton = new JButton(barycentricCaptureUnmapped);
+        panelBarycentricCalibration.add(btnNewButton, "4, 3");
+        
+        JPanel panelCameraPose = new JPanel();
+        panelCameraPose.setBorder(new TitledBorder(null, "Camera Pose Calibration", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+        contentPanel.add(panelCameraPose);
+        panelCameraPose.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,
+                FormFactory.RELATED_GAP_COLSPEC,
+                ColumnSpec.decode("default:grow"),},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                RowSpec.decode("default:grow"),
+                FormFactory.RELATED_GAP_ROWSPEC,
+                RowSpec.decode("default:grow"),}));
+        
+        chckbxEnableCameraPose = new JCheckBox("Enable Camera Pose Interpolation?");
+        panelCameraPose.add(chckbxEnableCameraPose, "2, 2, 7, 1");
+        
+        JLabel lblX_1 = new JLabel("X");
+        panelCameraPose.add(lblX_1, "4, 4");
+        
+        JLabel lblY_1 = new JLabel("Y");
+        panelCameraPose.add(lblY_1, "6, 4");
+        
+        JLabel lblZ_1 = new JLabel("Z");
+        panelCameraPose.add(lblZ_1, "8, 4");
+        
+        JLabel lblTop = new JLabel("Top");
+        panelCameraPose.add(lblTop, "2, 6, right, default");
+        
+        textFieldCamPoseTopX = new JTextField();
+        panelCameraPose.add(textFieldCamPoseTopX, "4, 6, fill, default");
+        textFieldCamPoseTopX.setColumns(10);
+        
+        textFieldCamPoseTopY = new JTextField();
+        panelCameraPose.add(textFieldCamPoseTopY, "6, 6, fill, default");
+        textFieldCamPoseTopY.setColumns(10);
+        
+        textFieldCamPoseTopZ = new JTextField();
+        panelCameraPose.add(textFieldCamPoseTopZ, "8, 6, fill, default");
+        textFieldCamPoseTopZ.setColumns(10);
+        
+        LocationButtonsPanel locationButtonsPanelCamPoseTop = new LocationButtonsPanel(textFieldCamPoseTopX, textFieldCamPoseTopY, textFieldCamPoseTopZ, null);
+        panelCameraPose.add(locationButtonsPanelCamPoseTop, "10, 6, left, default");
+        
+        JLabel lblBottom = new JLabel("Bottom");
+        panelCameraPose.add(lblBottom, "2, 8, right, default");
+        
+        textFieldCamPoseBottomX = new JTextField();
+        panelCameraPose.add(textFieldCamPoseBottomX, "4, 8, fill, default");
+        textFieldCamPoseBottomX.setColumns(10);
+        
+        textFieldCamPoseBottomY = new JTextField();
+        panelCameraPose.add(textFieldCamPoseBottomY, "6, 8, fill, default");
+        textFieldCamPoseBottomY.setColumns(10);
+        
+        textFieldCamPoseBottomZ = new JTextField();
+        panelCameraPose.add(textFieldCamPoseBottomZ, "8, 8, fill, default");
+        textFieldCamPoseBottomZ.setColumns(10);
+        
+        LocationButtonsPanel locationButtonsPanelCamPoseBottom = new LocationButtonsPanel(textFieldCamPoseBottomX, textFieldCamPoseBottomY, textFieldCamPoseBottomZ, null);
+        panelCameraPose.add(locationButtonsPanelCamPoseBottom, "10, 8, left, default");
+        
+        JPanel panelTerminal = new JPanel();
+        panelTerminal.setBorder(new TitledBorder(new EtchedBorder(EtchedBorder.LOWERED, null, null), "FireStep Terminal", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
+        contentPanel.add(panelTerminal);
+        panelTerminal.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                ColumnSpec.decode("default:grow"),
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                RowSpec.decode("100dlu"),}));
+        
+        terminalCommandTextField = new JTextField();
+        panelTerminal.add(terminalCommandTextField, "2, 2, fill, default");
+        terminalCommandTextField.setColumns(10);
+        terminalCommandTextField.setAction(terminalSend);
+        terminalCommandTextField.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_UP) {
+                    if (++historyIndex >= history.size()) {
+                        historyIndex = history.size() - 1;
+                    }
+                    terminalCommandTextField.setText(history.get(historyIndex));
+                }
+                else if (e.getKeyCode() == KeyEvent.VK_DOWN) {
+                    if (--historyIndex < 0) {
+                        historyIndex = 0;
+                    }
+                    terminalCommandTextField.setText(history.get(historyIndex));
+                }
+                else {
+                    super.keyTyped(e);
+                }
+            }
+        });
+        
+        JButton btnSend = new JButton(terminalSend);
+        panelTerminal.add(btnSend, "4, 2");
+        
+        JScrollPane scrollPane_1 = new JScrollPane();
+        panelTerminal.add(scrollPane_1, "2, 4, 3, 1, fill, fill");
+        
+        terminalLogTextPane = new JTextPane();
+        scrollPane_1.setViewportView(terminalLogTextPane);
+        
+        JPanel panelTools = new JPanel();
+        panelTools.setBorder(new TitledBorder(null, "Tools", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+        contentPanel.add(panelTools);
+        panelTools.setLayout(new FormLayout(new ColumnSpec[] {
+                FormFactory.RELATED_GAP_COLSPEC,
+                FormFactory.DEFAULT_COLSPEC,},
+            new RowSpec[] {
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,}));
+        
+        chckbxAutoDetectTool = new JCheckBox("Auto Detect Tool Offsets on First Move (EXPERIMENTAL)");
+        panelTools.add(chckbxAutoDetectTool, "2, 2");
     }
  
     @Override
     public void createBindings() {
         super.createBindings();
+        LengthConverter lengthConverter = new LengthConverter();
         IntegerConverter intConverter = new IntegerConverter();
         DoubleConverter doubleConverter = new DoubleConverter(Configuration.get().getLengthDisplayFormat());
         RotatableDeltaKinematicsCalculator calc = driver.getDeltaCalculator();
@@ -347,6 +425,34 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         
         addWrappedBinding(driver, "autoUpdateToolOffsets", chckbxAutoDetectTool, "selected");
         addWrappedBinding(driver.getBarycentricCalibration(), "enabled", chckbxEnableBarycentricInterpolation, "selected");
+        
+        
+        MutableLocationProxy camPoseTop = new MutableLocationProxy();
+        bind(UpdateStrategy.READ_WRITE, 
+                driver.getCameraPoseCalibration(), 
+                "top",
+                camPoseTop, "location");
+        addWrappedBinding(camPoseTop, "lengthX", textFieldCamPoseTopX, "text", 
+                lengthConverter);
+        addWrappedBinding(camPoseTop, "lengthY", textFieldCamPoseTopY, "text", 
+                lengthConverter);
+        addWrappedBinding(camPoseTop, "lengthZ", textFieldCamPoseTopZ, "text", 
+                lengthConverter);
+        
+        MutableLocationProxy camPoseBottom = new MutableLocationProxy();
+        bind(UpdateStrategy.READ_WRITE, 
+                driver.getCameraPoseCalibration(), 
+                "bottom",
+                camPoseBottom, "location");
+        addWrappedBinding(camPoseBottom, "lengthX", textFieldCamPoseBottomX, "text", 
+                lengthConverter);
+        addWrappedBinding(camPoseBottom, "lengthY", textFieldCamPoseBottomY, "text", 
+                lengthConverter);
+        addWrappedBinding(camPoseBottom, "lengthZ", textFieldCamPoseBottomZ, "text", 
+                lengthConverter);
+        
+        addWrappedBinding(driver.getCameraPoseCalibration(), "enabled", chckbxEnableCameraPose, "selected");
+        
 
         ComponentDecorators.decorateWithAutoSelect(textFieldE);
         ComponentDecorators.decorateWithAutoSelect(textFieldF);
@@ -358,6 +464,13 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         ComponentDecorators.decorateWithAutoSelect(textFieldHascX);
         ComponentDecorators.decorateWithAutoSelect(textFieldHascY);
         ComponentDecorators.decorateWithAutoSelect(textFieldHascZ);
+        
+        ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseTopX);
+        ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseTopY);
+        ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseTopZ);
+        ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseBottomX);
+        ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseBottomY);
+        ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseBottomZ);
     }
 
     @SuppressWarnings("serial")
@@ -596,4 +709,11 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     private JTextField textFieldGrZ;
     private JCheckBox checkBoxFireStepKinematics;
     private JCheckBox chckbxEnableBarycentricInterpolation;
+    private JTextField textFieldCamPoseTopX;
+    private JTextField textFieldCamPoseTopY;
+    private JTextField textFieldCamPoseTopZ;
+    private JTextField textFieldCamPoseBottomX;
+    private JTextField textFieldCamPoseBottomY;
+    private JTextField textFieldCamPoseBottomZ;
+    private JCheckBox chckbxEnableCameraPose;
 }

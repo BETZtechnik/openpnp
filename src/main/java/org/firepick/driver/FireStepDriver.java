@@ -118,6 +118,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Attribute(required=false)
 	private boolean useFireStepKinematics = true;
 	
+	@Element(required=false)
+	private CameraPoseCalibration cameraPoseCalibration = new CameraPoseCalibration();
+	
     private double nozzleStepsPerDegree =  8.888888888;
     private boolean nozzleEnabled = false;
     private boolean powerSupplyOn = false;
@@ -323,6 +326,18 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         Location scaledLocation = location.derive(null, null, null, null);
         if (barycentricCalibration.enabled) {
             scaledLocation = barycentric.interpolate(scaledLocation);
+        }
+        
+        if (cameraPoseCalibration.enabled) {
+            System.out.println("location " + scaledLocation);
+            // Calculate the offset per unit
+            Location offset = cameraPoseCalibration.bottom.subtract(cameraPoseCalibration.top);
+            offset = offset.multiply(1 / offset.getZ(), 1 / offset.getZ(), 0, 0);
+            // Determine how far in Z we are from the start point
+            Location delta = scaledLocation.subtract(cameraPoseCalibration.top);
+            // And scale the offset by the distance in Z
+            offset = offset.multiply(delta.getZ(), delta.getZ(), 0, 0);
+            scaledLocation = scaledLocation.add(offset);
         }
 	    
         if (useFireStepKinematics) {
@@ -1254,6 +1269,14 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             BarycentricCalibration barycentricCalibration) {
         this.barycentricCalibration = barycentricCalibration;
     }
+    
+    public CameraPoseCalibration getCameraPoseCalibration() {
+        return cameraPoseCalibration;
+    }
+
+    public void setCameraPoseCalibration(CameraPoseCalibration cameraPoseCalibration) {
+        this.cameraPoseCalibration = cameraPoseCalibration;
+    }
 
     public static class BarycentricCalibration {
         @Attribute
@@ -1357,4 +1380,39 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             }
         }
 	}
+    
+    public static class CameraPoseCalibration {
+        @Attribute(required=false)
+        boolean enabled = false;
+        
+        @Element(required=false)
+        Location top = new Location(LengthUnit.Millimeters);
+        
+        @Element(required=false)
+        Location bottom = new Location(LengthUnit.Millimeters);
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Location getTop() {
+            return top;
+        }
+
+        public void setTop(Location top) {
+            this.top = top;
+        }
+
+        public Location getBottom() {
+            return bottom;
+        }
+
+        public void setBottom(Location bottom) {
+            this.bottom = bottom;
+        }
+    }
 }
