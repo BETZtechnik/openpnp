@@ -97,7 +97,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private boolean usePwmVacuum = false; // Intended to provide legacy support for older FireStep versions.. might remove this later.
 
 	@Element(required=false)
-	private int PwmVacuumSetting = 50;   // Provides a default value.  This might change later depending on whether we want to 
+	private int pwmVacuumSetting = 50;   // Provides a default value.  This might change later depending on whether we want to 
 	                                     // run the pump harder for larger parts (might depend on nozzle, part size, etc..).
 	
 	@Element(required=false)
@@ -107,7 +107,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private boolean autoUpdateToolOffsets = false;
 
     @Element(required=false)
-	private BarycentricCalibration barycentricCalibration = new BarycentricCalibration();
+	private BarycentricCalibration barycentricCalibration;
     
 	@ElementList(required=false)
 	private List<CarouselDriver> carouselDrivers = new ArrayList<CarouselDriver>();
@@ -121,7 +121,10 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Element(required=false)
 	private CameraPoseCalibration cameraPoseCalibration = new CameraPoseCalibration();
 	
-    private double nozzleStepsPerDegree =  8.888888888;
+    @Attribute(required=false)
+	private double nozzleStepsPerDegree =  8.888888888;
+    
+    
     private boolean nozzleEnabled = false;
     private boolean powerSupplyOn = false;
     private BarycentricInterpolation barycentric;
@@ -162,6 +165,13 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 }
             }
         });
+	}
+	
+	@Commit
+	private void commit() {
+	    if (barycentricCalibration == null) {
+	        barycentricCalibration = new BarycentricCalibration(true);
+	    }
 	}
 	
 	public CarouselDriver getCarouselDriver(int address) {
@@ -1029,7 +1039,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	private void enableVacuumPump(boolean enable) throws Exception {
 	    logger.trace(String.format("FireStep: Vacuum pump: %s", enable?"Enabled":"Disabled" ));
 		if (usePwmVacuum) {
-		    setPwmPin(26,enable?PwmVacuumSetting:0);
+		    setPwmPin(26,enable?pwmVacuumSetting:0);
 		}
 		else {
 			toggleDigitalPin(26,enable); //Legacy support for older firestep users
@@ -1042,7 +1052,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	}
 	
 	public void setVacuumPumpPwm(int value) {
-		PwmVacuumSetting = value;
+		pwmVacuumSetting = value;
 		//TODO: Exception if PWM level is outside of 0-255
 	}
 
@@ -1098,6 +1108,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             sendJsonCommand(String.format("{'dimrf':%f}", deltaCalculator.getrF()));
             sendJsonCommand(String.format("{'dimspr':%f}", 0f));
             sendJsonCommand(String.format("{'dimhz':%f}", 32f));
+            sendJsonCommand(String.format("{'syspb':%d}", 53));
+            sendJsonCommand(String.format("{'syspu':%d}", 1));
             
             /*
              * When homing in MTO_FPD mode, FireStep requires that the home
@@ -1279,6 +1291,13 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
     }
 
     public static class BarycentricCalibration {
+        private static final Logger logger = LoggerFactory.getLogger(BarycentricCalibration.class);
+        
+        /**
+         * A default grid of 29x29 points with corners and hard to get to points excluded.
+         */
+        final private static String defaultGridPoints = "-80,-140:-70,-140:-60,-140:-50,-140:-40,-140:-30,-140:-20,-140:-10,-140:0,-140:10,-140:20,-140:30,-140:40,-140:50,-140:60,-140:70,-140:80,-140:-80,-130:-70,-130:-60,-130:-50,-130:-40,-130:-30,-130:-20,-130:-10,-130:0,-130:10,-130:20,-130:30,-130:40,-130:50,-130:60,-130:70,-130:80,-130:-90,-120:-80,-120:-70,-120:-60,-120:-50,-120:-40,-120:-30,-120:-20,-120:-10,-120:0,-120:10,-120:20,-120:30,-120:40,-120:50,-120:60,-120:70,-120:80,-120:90,-120:-100,-110:-90,-110:-80,-110:-70,-110:-60,-110:-50,-110:-40,-110:-30,-110:-20,-110:-10,-110:0,-110:10,-110:20,-110:30,-110:40,-110:50,-110:60,-110:70,-110:80,-110:90,-110:100,-110:-140,-100:-130,-100:-120,-100:-110,-100:-100,-100:-90,-100:-80,-100:-70,-100:-60,-100:-50,-100:-40,-100:-30,-100:-20,-100:-10,-100:0,-100:10,-100:20,-100:30,-100:40,-100:50,-100:60,-100:70,-100:80,-100:90,-100:100,-100:110,-100:120,-100:130,-100:140,-100:-140,-90:-130,-90:-120,-90:-110,-90:-100,-90:-90,-90:-80,-90:-70,-90:-60,-90:-50,-90:-40,-90:-30,-90:-20,-90:-10,-90:0,-90:10,-90:20,-90:30,-90:40,-90:50,-90:60,-90:70,-90:80,-90:90,-90:100,-90:110,-90:120,-90:130,-90:140,-90:-140,-80:-130,-80:-120,-80:-110,-80:-100,-80:-90,-80:-80,-80:-70,-80:-60,-80:-50,-80:-40,-80:-30,-80:-20,-80:-10,-80:0,-80:10,-80:20,-80:30,-80:40,-80:50,-80:60,-80:70,-80:80,-80:90,-80:100,-80:110,-80:120,-80:130,-80:140,-80:-140,-70:-130,-70:-120,-70:-110,-70:-100,-70:-90,-70:-80,-70:-70,-70:-60,-70:-50,-70:-40,-70:-30,-70:-20,-70:-10,-70:0,-70:10,-70:20,-70:30,-70:40,-70:50,-70:60,-70:70,-70:80,-70:90,-70:100,-70:110,-70:120,-70:130,-70:140,-70:-140,-60:-130,-60:-120,-60:-110,-60:-100,-60:-90,-60:-80,-60:-70,-60:-60,-60:-50,-60:-40,-60:-30,-60:-20,-60:-10,-60:0,-60:10,-60:20,-60:30,-60:40,-60:50,-60:60,-60:70,-60:80,-60:90,-60:100,-60:110,-60:120,-60:130,-60:140,-60:-140,-50:-130,-50:-120,-50:-110,-50:-100,-50:-90,-50:-80,-50:-70,-50:-60,-50:-50,-50:-40,-50:-30,-50:-20,-50:-10,-50:0,-50:10,-50:20,-50:30,-50:40,-50:50,-50:60,-50:70,-50:80,-50:90,-50:100,-50:110,-50:120,-50:130,-50:140,-50:-140,-40:-130,-40:-120,-40:-110,-40:-100,-40:-90,-40:-80,-40:-70,-40:-60,-40:-50,-40:-40,-40:-30,-40:-20,-40:-10,-40:0,-40:10,-40:20,-40:30,-40:40,-40:50,-40:60,-40:70,-40:80,-40:90,-40:100,-40:110,-40:120,-40:130,-40:140,-40:-140,-30:-130,-30:-120,-30:-110,-30:-100,-30:-90,-30:-80,-30:-70,-30:-60,-30:-50,-30:-40,-30:-30,-30:-20,-30:-10,-30:0,-30:10,-30:20,-30:30,-30:40,-30:50,-30:60,-30:70,-30:80,-30:90,-30:100,-30:110,-30:120,-30:130,-30:140,-30:-140,-20:-130,-20:-120,-20:-110,-20:-100,-20:-90,-20:-80,-20:-70,-20:-60,-20:-50,-20:-40,-20:-30,-20:-20,-20:-10,-20:0,-20:10,-20:20,-20:30,-20:40,-20:50,-20:60,-20:70,-20:80,-20:90,-20:100,-20:110,-20:120,-20:130,-20:140,-20:-140,-10:-130,-10:-120,-10:-110,-10:-100,-10:-90,-10:-80,-10:-70,-10:-60,-10:-50,-10:-40,-10:-30,-10:-20,-10:-10,-10:0,-10:10,-10:20,-10:30,-10:40,-10:50,-10:60,-10:70,-10:80,-10:90,-10:100,-10:110,-10:120,-10:130,-10:140,-10:-140,0:-130,0:-120,0:-110,0:-100,0:-90,0:-80,0:-70,0:-60,0:-50,0:-40,0:-30,0:-20,0:-10,0:0,0:10,0:20,0:30,0:40,0:50,0:60,0:70,0:80,0:90,0:100,0:110,0:120,0:130,0:140,0:-140,10:-130,10:-120,10:-110,10:-100,10:-90,10:-80,10:-70,10:-60,10:-50,10:-40,10:-30,10:-20,10:-10,10:0,10:10,10:20,10:30,10:40,10:50,10:60,10:70,10:80,10:90,10:100,10:110,10:120,10:130,10:140,10:-140,20:-130,20:-120,20:-110,20:-100,20:-90,20:-80,20:-70,20:-60,20:-50,20:-40,20:-30,20:-20,20:-10,20:0,20:10,20:20,20:30,20:40,20:50,20:60,20:70,20:80,20:90,20:100,20:110,20:120,20:130,20:140,20:-140,30:-130,30:-120,30:-110,30:-100,30:-90,30:-80,30:-70,30:-60,30:-50,30:-40,30:-30,30:-20,30:-10,30:0,30:10,30:20,30:30,30:40,30:50,30:60,30:70,30:80,30:90,30:100,30:110,30:120,30:130,30:140,30:-140,40:-130,40:-120,40:-110,40:-100,40:-90,40:-80,40:-70,40:-60,40:-50,40:-40,40:-30,40:-20,40:-10,40:0,40:10,40:20,40:30,40:40,40:50,40:60,40:70,40:80,40:90,40:100,40:110,40:120,40:130,40:140,40:-90,50:-80,50:-70,50:-60,50:-50,50:-40,50:-30,50:-20,50:-10,50:0,50:10,50:20,50:30,50:40,50:50,50:60,50:70,50:80,50:90,50:-90,60:-80,60:-70,60:-60,60:-50,60:-40,60:-30,60:-20,60:-10,60:0,60:10,60:20,60:30,60:40,60:50,60:60,60:70,60:80,60:90,60:-90,70:-80,70:-70,70:-60,70:-50,70:-40,70:-30,70:-20,70:-10,70:0,70:10,70:20,70:30,70:40,70:50,70:60,70:70,70:80,70:90,70:-90,80:-80,80:-70,80:-60,80:-50,80:-40,80:-30,80:-20,80:-10,80:0,80:10,80:20,80:30,80:40,80:50,80:60,80:70,80:80,80:90,80:-70,90:-60,90:-50,90:-40,90:-30,90:-20,90:-10,90:0,90:10,90:20,90:30,90:40,90:50,90:60,90:70,90:-60,100:-50,100:-40,100:-30,100:-20,100:-10,100:0,100:10,100:20,100:30,100:40,100:50,100:60,100:-60,110:-50,110:-40,110:-30,110:-20,110:-10,110:0,110:10,110:20,110:30,110:40,110:50,110:60,110:-60,120:-50,120:-40,120:-30,120:-20,120:-10,120:0,120:10,120:20,120:30,120:40,120:50,120:60,120:-60,130:-50,130:-40,130:-30,130:-20,130:-10,130:0,130:10,130:20,130:30,130:40,130:50,130:60,130:-60,140:-50,140:-40,140:-30,140:-20,140:-10,140:0,140:10,140:20,140:30,140:40,140:50,140:60,140";
+
         @Attribute
         private boolean enabled;
         
@@ -1300,9 +1319,31 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         @ElementMap(required=false)
         private Map<Point, DomainAndRange> mappedPoints = new LinkedHashMap<>();
         
+        public BarycentricCalibration(boolean addDefaultGridPoints) {
+            if (addDefaultGridPoints) {
+                gridPoints.addAll(getDefaultGridPoints());
+            }
+        }
+        
+        public BarycentricCalibration() {
+            this(false);
+        }
+        
         @Commit
         private void commit() {
-            logger.info("BarycentricCalibration: {} unmapped points.", getUnmappedGridPoints().size());
+            logger.info("{} of {} unmapped points.", getUnmappedGridPoints().size(), gridPoints.size());
+        }
+        
+        private static List<Point> getDefaultGridPoints() {
+            List<Point> gridPoints = new ArrayList<>();
+            String[] points = defaultGridPoints.split(":");
+            for (String point : points) {
+                String[] coords = point.split(",");
+                double x = Double.parseDouble(coords[0]);
+                double y = Double.parseDouble(coords[1]);
+                gridPoints.add(new Point(x, y));
+            }
+            return gridPoints;
         }
         
         public Map<Location, Location> getMap() {
