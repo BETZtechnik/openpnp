@@ -485,7 +485,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		// Wait up to 3 seconds for FireStep to say hi, and throw away the
 		// results. Due to the startup EEPROM stuff this could include
 		// any number of messages. We just want to ignore it all.
-		List<JsonObject> responses = sendJsonCommand(null, 3000);
+		try {
+		    sendJsonCommand(null, 3000);
+		}
+		catch (Exception e) {
+		    // catch the potential timeout
+		}
 		
 		// Now send the version request. Any previous version response should
 		// have been eaten up earlier so the next one we see should represent
