@@ -45,11 +45,6 @@ public class CarouselFeeder extends ReferenceFeeder {
     private Location pickLocation;
     
     @Override
-    public boolean canFeedToNozzle(Nozzle nozzle) {
-        return true;
-    }
-
-    @Override
     public Location getPickLocation() throws Exception {
         return pickLocation;
     }
