@@ -22,13 +22,13 @@ along with OpenPnP.  If not, see <http://www.gnu.org/licenses/>.
 package org.firepick.driver.wizards;
 
 import java.awt.Color;
-import java.awt.FlowLayout;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Future;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
@@ -38,9 +38,9 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
 
@@ -48,6 +48,7 @@ import org.firepick.driver.FireStepDriver;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
 import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
 import org.openpnp.gui.components.ComponentDecorators;
+import org.openpnp.gui.components.LocationButtonsPanel;
 import org.openpnp.gui.support.DoubleConverter;
 import org.openpnp.gui.support.IntegerConverter;
 import org.openpnp.gui.support.LengthConverter;
@@ -59,13 +60,12 @@ import org.openpnp.model.Configuration;
 import org.openpnp.model.Location;
 import org.openpnp.spi.Nozzle;
 
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.gson.JsonObject;
 import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
-
-import org.openpnp.gui.components.LocationButtonsPanel;
 
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
@@ -622,12 +622,35 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
                     JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
                 return;
             }
-            try {
-                driver.barycentricCapture(false);
-            }
-            catch (Exception e1){
-                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            driver.barycentricCapture(false, new FutureCallback<Void>() {
+                @Override
+                public void onSuccess(Void arg0) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            JOptionPane.showMessageDialog(
+                                    getTopLevelAncestor(),
+                                    String.format(
+                                            "Calibration finished.\r\n" +
+                                            "%d of %d points were not able to be mapped.\r\n" +
+                                            "You can run Barycentric Capture (Unmapped) to try the unmapped ones again.",
+                                            driver.getBarycentricCalibration().getUnmappedGridPoints().size(),
+                                            driver.getBarycentricCalibration().getGridPoints().size()));
+                        }
+                    });
+                }
+                
+                @Override
+                public void onFailure(final Throwable arg0) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            MessageBoxes.errorBox(
+                                    getTopLevelAncestor(), 
+                                    "Error", 
+                                    arg0);
+                        }
+                    });
+                }
+            });
         }
     };
     
@@ -658,12 +681,35 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
                     JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
                 return;
             }
-            try {
-                driver.barycentricCapture(true);
-            }
-            catch (Exception e1){
-                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            driver.barycentricCapture(true, new FutureCallback<Void>() {
+                @Override
+                public void onSuccess(Void arg0) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            JOptionPane.showMessageDialog(
+                                    getTopLevelAncestor(),
+                                    String.format(
+                                            "Calibration finished.\r\n" +
+                                            "%d of %d points were not able to be mapped.\r\n" +
+                                            "You can run Barycentric Capture (Unmapped) to try the unmapped ones again.",
+                                            driver.getBarycentricCalibration().getUnmappedGridPoints().size(),
+                                            driver.getBarycentricCalibration().getGridPoints().size()));
+                        }
+                    });
+                }
+                
+                @Override
+                public void onFailure(final Throwable arg0) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            MessageBoxes.errorBox(
+                                    getTopLevelAncestor(), 
+                                    "Error", 
+                                    arg0);
+                        }
+                    });
+                }
+            });
         }
     };
     

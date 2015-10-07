@@ -36,6 +36,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -83,6 +85,7 @@ import org.simpleframework.xml.core.Commit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -440,10 +443,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
     
     public void moveToFireStepKinematics(ReferenceHeadMountable hm, Location location, double speed)
             throws Exception {
-        sendJsonCommand(String.format("{'mov':{'x':%f,'y':%f,'z':%f}}", 
+        sendJsonCommand(String.format("{'mov':{'x':%f,'y':%f,'z':%f,'a':%f,'mv':%d}}", 
                 -location.getX(), 
                 -location.getY(), 
-                location.getZ()
+                location.getZ(),
+                location.getRotation() * nozzleStepsPerDegree,
+                rawFeedrate
                 ), 10000);
     }
     
@@ -669,14 +674,14 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         return bed_level;
     }
     
-    public void barycentricCapture(final boolean unmappedOnly) throws Exception {
+    public Future<Void> barycentricCapture(final boolean unmappedOnly, FutureCallback<Void> callback) {
         final int numTries = 10;
         final double maxErrorDistance = 5;
         final double minErrorDistance = 0.1;
         final Map<Point, DomainAndRange> map = new LinkedHashMap<>();
-        MainFrame.machineControlsPanel.submitMachineTask(new Runnable() {
+        return Configuration.get().getMachine().submit(new Callable<Void>() {
             @Override
-            public void run() {
+            public Void call() throws Exception {
                 ReferenceCamera camera = (ReferenceCamera) Configuration.get().getMachine().getHeads().get(0).getCameras().get(0);
                 Location startLocation = unmappedOnly ? barycentricCalibration.startLocation : camera.getLocation();
 
@@ -703,6 +708,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                             barycentricCalibration.getUnmappedGridPoints() 
                             : barycentricCalibration.gridPoints;
                     for (Point point : points) {
+                        if (Thread.currentThread().isInterrupted()) {
+                            logger.info("Barycentric capture interrupted, cancelling.");
+                        }
                         logger.info("Checking {} of {} points.", ++pointsChecked, points.size());
                         Location location = new Location(
                                 barycentricCalibration.gridPointsUnits,
@@ -788,8 +796,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 }
                 barycentricCalibration.getMappedGridPoints().putAll(map);
                 barycentricCalibration.startLocation = startLocation;
+                return null;
             }
-        });
+        }, callback);
     }
     
     /**
@@ -1331,7 +1340,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         
         @Commit
         private void commit() {
-            logger.info("{} of {} unmapped points.", getUnmappedGridPoints().size(), gridPoints.size());
+            logger.info("{} unmapped points of {} total points.", getUnmappedGridPoints().size(), gridPoints.size());
         }
         
         private static List<Point> getDefaultGridPoints() {
