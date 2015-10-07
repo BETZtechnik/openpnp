@@ -416,14 +416,20 @@ public class ReferenceJobProcessor extends AbstractJobProcessor {
         }
 
         // Request that the Feeder feeds the part
-        try {
-            feeder.feed(nozzle);
-        }
-        catch (Exception e) {
-            fireJobEncounteredError(JobError.FeederError, e.getMessage());
-            return false;
+        while (shouldJobProcessingContinue()) {
+            try {
+                feeder.feed(nozzle);
+                break;
+            }
+            catch (Exception e) {
+                fireJobEncounteredError(JobError.FeederError, e.getMessage());
+            }
         }
         
+        if (!shouldJobProcessingContinue()) {
+            return false;
+        }
+
         // Now that the Feeder has done it's feed operation we can get
         // the pick location from it.
         Location pickLocation;
@@ -502,18 +508,6 @@ public class ReferenceJobProcessor extends AbstractJobProcessor {
 
         fireDetailedStatusUpdated(String.format("Move to safe Z at (%s).", nozzle.getLocation()));
 
-		// Check if the feeder is empty for the next pick, and alert the user if
-        // it is. The user may reload the feeder and reset the feed count to
-        // continue the job.
-        // TODO: Note, this is a temporary fix. There are many other reasons
-        // the feeder may not be able to feed, so Feeder is empty will not
-        // always be valid. Instead, we should attempt to feed and if we are not
-        // able to (i.e. Feeder throw an error) we should offer the user the
-        // chance to loop and retry at that point.
-		if (!feeder.canFeedToNozzle(nozzle)) {
-			fireJobEncounteredError(JobError.FeederError, String.format("Feeder %s is empty.", feeder.getName()));
-		}
-		
         if (!shouldJobProcessingContinue()) {
             return false;
         }
