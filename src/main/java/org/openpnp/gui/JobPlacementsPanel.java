@@ -7,7 +7,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 import javax.swing.AbstractAction;
@@ -131,10 +130,6 @@ public class JobPlacementsPanel extends JPanel {
         JButton btnEditFeeder = new JButton(editPlacementFeederAction);
         btnEditFeeder.setHideActionText(true);
         toolBarPlacements.add(btnEditFeeder);
-        
-        toolBarPlacements.addSeparator();
-        toolBarPlacements.add(new JButton(captureGilterLocation));
-        toolBarPlacements.add(new JButton(dumpGilterLocations));
 
         tableModel = new PlacementsTableModel(configuration);
 
@@ -460,38 +455,6 @@ public class JobPlacementsPanel extends JPanel {
         }
     };
     
-    HashMap<String, Location[]> gfilterLocations = new HashMap<>();
-    public final Action captureGilterLocation = new AbstractAction("Capture Gfilter") {
-        @Override
-        public void actionPerformed(ActionEvent arg0) {
-            Location placementLocation = 
-                    Utils2D.calculateBoardPlacementLocation(
-                            boardLocation.getLocation(),
-                            boardLocation.getSide(),
-                            getSelection().getLocation());
-            Location location = MainFrame.mainFrame.cameraPanel.getSelectedCameraLocation();
-            System.out.println(placementLocation + " -> " + location);
-            gfilterLocations.put(getSelection().getId(), new Location[] { placementLocation, location });
-        }
-    };
-    
-    public final Action dumpGilterLocations = new AbstractAction("Dump Gfilter") {
-        @Override
-        public void actionPerformed(ActionEvent arg0) {
-            for (String placementId : gfilterLocations.keySet()) {
-                Location[] locations = gfilterLocations.get(placementId);
-                Location placementLocation = locations[0];
-                Location location = locations[1];
-                System.out.println(String.format("%s\t%f\t%f\t%f\t%f",
-                        placementId,
-                        placementLocation.getX(),
-                        placementLocation.getY(),
-                        location.getX(),
-                        location.getY()));
-            }
-        }
-    };
-
     public final Action setTypeAction = new AbstractAction() {
         {
             putValue(NAME, "Set Type");
