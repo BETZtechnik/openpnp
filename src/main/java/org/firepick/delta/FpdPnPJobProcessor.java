@@ -218,7 +218,7 @@ public class FpdPnPJobProcessor extends AbstractJobProcessor {
                 }
             }
         }
-        throw new Exception("No feeders available to feed " + part.getName());
+        throw new Exception("No feeders available to feed " + part.getId());
     }
     
 	protected boolean pick(Nozzle nozzle, BoardLocation boardLocation, Placement placement) {
