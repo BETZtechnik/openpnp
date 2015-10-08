@@ -106,6 +106,10 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
                 FormFactory.RELATED_GAP_ROWSPEC,
                 FormFactory.DEFAULT_ROWSPEC,
                 FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC,
+                FormFactory.RELATED_GAP_ROWSPEC,
                 FormFactory.DEFAULT_ROWSPEC,}));
         
         JLabel lblUseFirestepKinematics = new JLabel("Use FireStep Kinematics?");
@@ -142,46 +146,60 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         panelDelta.add(textFieldF, "8, 8, fill, default");
         textFieldF.setColumns(10);
         
+        JLabel lblMotorStepsPer = new JLabel("Motor Steps Per Rotation");
+        panelDelta.add(lblMotorStepsPer, "2, 10");
+        
+        JLabel lblMotorMicrostepsPer = new JLabel("Motor Microsteps Per Step");
+        panelDelta.add(lblMotorMicrostepsPer, "4, 10");
+        
+        textFieldSteps = new JTextField();
+        panelDelta.add(textFieldSteps, "2, 12, fill, default");
+        textFieldSteps.setColumns(10);
+        
+        textFieldMicrosteps = new JTextField();
+        panelDelta.add(textFieldMicrosteps, "4, 12, fill, default");
+        textFieldMicrosteps.setColumns(10);
+        
         JLabel lblX = new JLabel("X");
-        panelDelta.add(lblX, "4, 12, center, default");
+        panelDelta.add(lblX, "4, 16, center, default");
         
         JLabel lblY = new JLabel("Y");
-        panelDelta.add(lblY, "6, 12, center, default");
+        panelDelta.add(lblY, "6, 16, center, default");
         
         JLabel lblZ = new JLabel("Z");
-        panelDelta.add(lblZ, "8, 12, center, default");
+        panelDelta.add(lblZ, "8, 16, center, default");
         
         JLabel lblHomeAngleStep = new JLabel("Home Angle Step Counts");
-        panelDelta.add(lblHomeAngleStep, "2, 14");
+        panelDelta.add(lblHomeAngleStep, "2, 18");
         
         textFieldHascX = new JTextField();
-        panelDelta.add(textFieldHascX, "4, 14, fill, default");
+        panelDelta.add(textFieldHascX, "4, 18, fill, default");
         textFieldHascX.setColumns(10);
         
         textFieldHascY = new JTextField();
-        panelDelta.add(textFieldHascY, "6, 14, fill, default");
+        panelDelta.add(textFieldHascY, "6, 18, fill, default");
         textFieldHascY.setColumns(10);
         
         textFieldHascZ = new JTextField();
-        panelDelta.add(textFieldHascZ, "8, 14, fill, default");
+        panelDelta.add(textFieldHascZ, "8, 18, fill, default");
         textFieldHascZ.setColumns(10);
         
         JButton btnReadHasc = new JButton(hascRead);
-        panelDelta.add(btnReadHasc, "10, 14");
+        panelDelta.add(btnReadHasc, "10, 18");
         
         JLabel lblGearRatios = new JLabel("Gear Ratios");
-        panelDelta.add(lblGearRatios, "2, 16, right, default");
+        panelDelta.add(lblGearRatios, "2, 20, right, default");
         
         textFieldGrX = new JTextField();
-        panelDelta.add(textFieldGrX, "4, 16, fill, default");
+        panelDelta.add(textFieldGrX, "4, 20, fill, default");
         textFieldGrX.setColumns(10);
         
         textFieldGrY = new JTextField();
-        panelDelta.add(textFieldGrY, "6, 16, fill, default");
+        panelDelta.add(textFieldGrY, "6, 20, fill, default");
         textFieldGrY.setColumns(10);
         
         textFieldGrZ = new JTextField();
-        panelDelta.add(textFieldGrZ, "8, 16, fill, default");
+        panelDelta.add(textFieldGrZ, "8, 20, fill, default");
         textFieldGrZ.setColumns(10);
         
         JPanel panelBedLeveling = new JPanel();
@@ -422,6 +440,8 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         addWrappedBinding(calc, "homeAngleStepsX", textFieldHascX, "text", intConverter);
         addWrappedBinding(calc, "homeAngleStepsY", textFieldHascY, "text", intConverter);
         addWrappedBinding(calc, "homeAngleStepsZ", textFieldHascZ, "text", intConverter);
+        addWrappedBinding(calc, "stepsPerMotorRotation", textFieldSteps, "text", doubleConverter);
+        addWrappedBinding(calc, "motorMicrosteps", textFieldMicrosteps, "text", doubleConverter);
         
         addWrappedBinding(driver, "autoUpdateToolOffsets", chckbxAutoDetectTool, "selected");
         addWrappedBinding(driver.getBarycentricCalibration(), "enabled", chckbxEnableBarycentricInterpolation, "selected");
@@ -464,6 +484,8 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         ComponentDecorators.decorateWithAutoSelect(textFieldHascX);
         ComponentDecorators.decorateWithAutoSelect(textFieldHascY);
         ComponentDecorators.decorateWithAutoSelect(textFieldHascZ);
+        ComponentDecorators.decorateWithAutoSelect(textFieldSteps);
+        ComponentDecorators.decorateWithAutoSelect(textFieldMicrosteps);
         
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseTopX);
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseTopY);
@@ -762,4 +784,6 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     private JTextField textFieldCamPoseBottomY;
     private JTextField textFieldCamPoseBottomZ;
     private JCheckBox chckbxEnableCameraPose;
+    private JTextField textFieldSteps;
+    private JTextField textFieldMicrosteps;
 }

@@ -342,7 +342,6 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         }
         
         if (cameraPoseCalibration.enabled) {
-            System.out.println("location " + scaledLocation);
             // Calculate the offset per unit
             Location offset = cameraPoseCalibration.bottom.subtract(cameraPoseCalibration.top);
             offset = offset.multiply(1 / offset.getZ(), 1 / offset.getZ(), 0, 0);
@@ -479,39 +478,68 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		 * already be running and we will get nothing on connect.
 		 */
 	    
-		readerThread = new Thread(this);
+        connectedVersion = "";
+        connected = false;
+
+        readerThread = new Thread(this);
 		readerThread.start();
 		
-		// Wait up to 3 seconds for FireStep to say hi, and throw away the
+		// Flick DTR to reset the Arduino, if possible.
+		serialPort.setDTR(true);
+		Thread.sleep(100);
+		serialPort.setDTR(false);
+		
+        // Wait up to 5 seconds for FireStep to say hi, and throw away the
 		// results. Due to the startup EEPROM stuff this could include
 		// any number of messages. We just want to ignore it all.
 		try {
-		    sendJsonCommand(null, 3000);
+		    sendJsonCommand(null, 5000);
 		}
 		catch (Exception e) {
-		    // catch the potential timeout
+		    // We might receive trash, or nothing, so catch the potential exception.
 		}
 		
-		// Now send the version request. Any previous version response should
-		// have been eaten up earlier so the next one we see should represent
-		// being synchronized to the flow control.
-        connectedVersion = "";
-        connected = false;
-        // Look for the version response
+		// Now we want to synchronize with the flow control. We send junk that
+		// we know that FireStep would never send and see if we see it in the
+		// response. If we do we know that we are synced up to the current
+		// command.
+		boolean synced = false;
+		for (int i = 0; !synced && i < 3; i++) {
+		    try {
+		        String key = "__" + i;
+		        for (JsonObject o : sendJsonCommand(String.format("{'%s':''}", key), 5000, false)) {
+		            if (o.get("r").getAsJsonObject().has(key)) {
+		                synced = true;
+		                break;
+		            }
+		        }
+		    }
+		    catch (Exception e) {
+		    }
+		}
+		
+        if (!synced)  {
+            throw new Error(
+                String.format("Unable to receive connection response from FireStep. Check your port and baud rate, and that you are running at least version %f of FireStep", 
+                        minimumRequiredVersion));
+        }
+	
+        // Now send the version request. Any previous version response should
+        // have been eaten up earlier so the next one we see should be valid.
         for (JsonObject o : sendJsonCommand("{'sysv':''}")) {
             JsonObject response = o.get("r").getAsJsonObject();
             if (response.has("sysv")) {
                 connected = true;
-                connectedVersion = response.get("sysv").getAsString(); 
+                connectedVersion = response.get("sysv").getAsString();
             }
         }
-	
-		if (!connected)  {
-			throw new Error(
-				String.format("Unable to receive connection response from FireStep. Check your port and baud rate, and that you are running at least version %f of FireStep", 
-						minimumRequiredVersion));
-		}
 		
+        if (!connected)  {
+            throw new Error(
+                String.format("Unable to receive connection response from FireStep. Check your port and baud rate, and that you are running at least version %f of FireStep", 
+                        minimumRequiredVersion));
+        }
+        
 		//TODO: Commenting this out for now. Will implement version checks once we get the prototoype working.
 		//if (connectedVersion < minimumRequiredVersion) {
 		//	throw new Error(String.format("This driver requires Marlin version %.2f or higher. You are running version %.2f", minimumRequiredVersion, connectedVersion));
@@ -1168,14 +1196,18 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         return sendJsonCommand(command, 5000);
     }
 	
-	/**
+    public List<JsonObject> sendJsonCommand(String command, long timeout) throws Exception {
+        return sendJsonCommand(command, timeout, true);
+    }
+
+        /**
 	 * Send a command and wait timeout milliseconds for it to return.
 	 * @param command
 	 * @param timeout
 	 * @return
 	 * @throws Exception
 	 */
-    public List<JsonObject> sendJsonCommand(String command, long timeout) throws Exception {
+    public List<JsonObject> sendJsonCommand(String command, long timeout, boolean checkStatus) throws Exception {
         List<JsonObject> responses = new ArrayList<>();
         
         // Read any responses that might be queued up so that when we wait
@@ -1205,11 +1237,13 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         // Read any additional responses that came in after the initial one.
         responseQueue.drainTo(responses);
 
-        // Check if any of the responses were failures.
-        for (JsonObject o : responses) {
-            if (o.has("s") && o.get("s").getAsInt() != 0) {
-                logger.error("{} => {}", command, responses);
-                throw new Exception("FireStep command failed " + o);
+        if (checkStatus) {
+            // Check if any of the responses were failures.
+            for (JsonObject o : responses) {
+                if (o.has("s") && o.get("s").getAsInt() != 0) {
+                    logger.error("{} => {}", command, responses);
+                    throw new Exception("FireStep command failed " + o);
+                }
             }
         }
         
