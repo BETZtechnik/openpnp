@@ -204,14 +204,20 @@ public class ReferenceCameraConfigurationWizard extends
         panelLocation.add(textFieldLocationRotation, "8, 4, fill, default");
         textFieldLocationRotation.setColumns(8);
         
-        if (referenceCamera.getHead() == null) {
-            locationButtonsPanel = new LocationButtonsPanel(textFieldLocationX, textFieldLocationY, textFieldLocationZ, textFieldLocationRotation);
-            panelLocation.add(locationButtonsPanel, "10, 4, fill, fill");
-            panelOffsets.setVisible(false);
-            panelSafeZ.setVisible(false);
+        try {
+            // Causes WindowBuilder to fail, so just throw away the error.
+            if (referenceCamera.getHead() == null) {
+                locationButtonsPanel = new LocationButtonsPanel(textFieldLocationX, textFieldLocationY, textFieldLocationZ, textFieldLocationRotation);
+                panelLocation.add(locationButtonsPanel, "10, 4, fill, fill");
+                panelOffsets.setVisible(false);
+                panelSafeZ.setVisible(false);
+            }
+            else {
+                panelLocation.setVisible(false);
+            }
         }
-        else {
-            panelLocation.setVisible(false);
+        catch (Exception e) {
+            
         }
     }
     
