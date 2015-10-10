@@ -1133,6 +1133,13 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	
     private void setFireStepKinematicsEnabled(boolean enabled) throws Exception {
         if (enabled) {
+        	ReferenceNozzle nozzle = (ReferenceNozzle) Configuration
+        			.get()
+        			.getMachine()
+        			.getHeads()
+        			.get(0)
+        			.getNozzles()
+        			.get(0);
             sendJsonCommand("{'systo':1}");
             // I know these can all be sent in one go, but it makes the
             // code hard to read and modify. Feel free to change it if it
@@ -1149,7 +1156,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             sendJsonCommand(String.format("{'dimre':%f}", deltaCalculator.getrE()));
             sendJsonCommand(String.format("{'dimrf':%f}", deltaCalculator.getrF()));
             sendJsonCommand(String.format("{'dimspr':%f}", 0f));
-            sendJsonCommand(String.format("{'dimhz':%f}", 32f));
+            sendJsonCommand(String.format("{'dimhz':%f}", nozzle.getSafeZ().getValue() - nozzle.getHeadOffsets().getZ()));
             sendJsonCommand(String.format("{'syspb':%d}", 53));
             sendJsonCommand(String.format("{'syspu':%d}", 1));
             
