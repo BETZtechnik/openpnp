@@ -32,120 +32,115 @@ import javax.swing.border.TitledBorder;
 import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
 import org.openpnp.gui.components.ComponentDecorators;
 import org.openpnp.gui.support.AbstractConfigurationWizard;
-import org.openpnp.gui.support.DoubleConverter;
 import org.openpnp.gui.support.LengthConverter;
 import org.openpnp.gui.support.MutableLocationProxy;
 import org.openpnp.machine.reference.ReferenceActuator;
-import org.openpnp.model.Configuration;
 
-import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
+import com.jgoodies.forms.layout.FormSpecs;
 import com.jgoodies.forms.layout.RowSpec;
 
-import java.awt.Component;
-
+@SuppressWarnings("serial")
 public class ReferenceActuatorConfigurationWizard extends
-		AbstractConfigurationWizard {
-	private final ReferenceActuator actuator;
+        AbstractConfigurationWizard {
+    private final ReferenceActuator actuator;
 
-	private JTextField locationX;
-	private JTextField locationY;
-	private JTextField locationZ;
-	private JPanel panelOffsets;
-	private JPanel panelSafeZ;
-	private JLabel lblSafeZ;
-	private JTextField textSafeZ;
+    private JTextField locationX;
+    private JTextField locationY;
+    private JTextField locationZ;
+    private JPanel panelOffsets;
+    private JPanel panelSafeZ;
+    private JLabel lblSafeZ;
+    private JTextField textFieldSafeZ;
 
-	public ReferenceActuatorConfigurationWizard(ReferenceActuator actuator) {
-		this.actuator = actuator;
+    public ReferenceActuatorConfigurationWizard(ReferenceActuator actuator) {
+        this.actuator = actuator;
 
-		panelOffsets = new JPanel();
-		panelOffsets.setBorder(new TitledBorder(new EtchedBorder(
-				EtchedBorder.LOWERED, null, null), "Offsets",
-				TitledBorder.LEADING, TitledBorder.TOP, null,
-				new Color(0, 0, 0)));
-		panelOffsets.setLayout(new FormLayout(
-				new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC,
-						FormFactory.DEFAULT_COLSPEC,
-						FormFactory.RELATED_GAP_COLSPEC,
-						FormFactory.DEFAULT_COLSPEC,
-						FormFactory.RELATED_GAP_COLSPEC,
-						FormFactory.DEFAULT_COLSPEC,
-						FormFactory.RELATED_GAP_COLSPEC,
-						FormFactory.DEFAULT_COLSPEC, }, new RowSpec[] {
-						FormFactory.RELATED_GAP_ROWSPEC,
-						FormFactory.DEFAULT_ROWSPEC,
-						FormFactory.RELATED_GAP_ROWSPEC,
-						FormFactory.DEFAULT_ROWSPEC, }));
+        panelOffsets = new JPanel();
+        contentPanel.add(panelOffsets);
+        panelOffsets.setBorder(new TitledBorder(new EtchedBorder(
+                EtchedBorder.LOWERED, null, null), "Offsets",
+                TitledBorder.LEADING, TitledBorder.TOP, null,
+                new Color(0, 0, 0)));
+        panelOffsets.setLayout(new FormLayout(
+                new ColumnSpec[] { FormSpecs.RELATED_GAP_COLSPEC,
+                        FormSpecs.DEFAULT_COLSPEC,
+                        FormSpecs.RELATED_GAP_COLSPEC,
+                        FormSpecs.DEFAULT_COLSPEC,
+                        FormSpecs.RELATED_GAP_COLSPEC,
+                        FormSpecs.DEFAULT_COLSPEC,
+                        FormSpecs.RELATED_GAP_COLSPEC,
+                        FormSpecs.DEFAULT_COLSPEC, }, new RowSpec[] {
+                        FormSpecs.RELATED_GAP_ROWSPEC,
+                        FormSpecs.DEFAULT_ROWSPEC,
+                        FormSpecs.RELATED_GAP_ROWSPEC,
+                        FormSpecs.DEFAULT_ROWSPEC, }));
 
-		JLabel lblX = new JLabel("X");
-		panelOffsets.add(lblX, "2, 2");
+        JLabel lblX = new JLabel("X");
+        panelOffsets.add(lblX, "2, 2");
 
-		JLabel lblY = new JLabel("Y");
-		panelOffsets.add(lblY, "4, 2");
+        JLabel lblY = new JLabel("Y");
+        panelOffsets.add(lblY, "4, 2");
 
-		JLabel lblZ = new JLabel("Z");
-		panelOffsets.add(lblZ, "6, 2");
+        JLabel lblZ = new JLabel("Z");
+        panelOffsets.add(lblZ, "6, 2");
 
-		locationX = new JTextField();
-		panelOffsets.add(locationX, "2, 4");
-		locationX.setColumns(5);
+        locationX = new JTextField();
+        panelOffsets.add(locationX, "2, 4");
+        locationX.setColumns(5);
 
-		locationY = new JTextField();
-		panelOffsets.add(locationY, "4, 4");
-		locationY.setColumns(5);
+        locationY = new JTextField();
+        panelOffsets.add(locationY, "4, 4");
+        locationY.setColumns(5);
 
-		locationZ = new JTextField();
-		panelOffsets.add(locationZ, "6, 4");
-		locationZ.setColumns(5);
+        locationZ = new JTextField();
+        panelOffsets.add(locationZ, "6, 4");
+        locationZ.setColumns(5);
 
-		contentPanel.add(panelOffsets);
+        contentPanel.add(panelOffsets);
+        
+        panelSafeZ = new JPanel();
+        panelSafeZ.setBorder(new TitledBorder(null, "Safe Z", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+        contentPanel.add(panelSafeZ);
+        panelSafeZ.setLayout(new FormLayout(new ColumnSpec[] {
+        		FormSpecs.RELATED_GAP_COLSPEC,
+        		FormSpecs.DEFAULT_COLSPEC,
+        		FormSpecs.RELATED_GAP_COLSPEC,
+        		FormSpecs.DEFAULT_COLSPEC,},
+        	new RowSpec[] {
+        		FormSpecs.RELATED_GAP_ROWSPEC,
+        		FormSpecs.DEFAULT_ROWSPEC,}));
+        
+        lblSafeZ = new JLabel("Safe Z");
+        panelSafeZ.add(lblSafeZ, "2, 2, right, default");
+        
+        textFieldSafeZ = new JTextField();
+        panelSafeZ.add(textFieldSafeZ, "4, 2, fill, default");
+        textFieldSafeZ.setColumns(10);
+    }
 
-		panelSafeZ = new JPanel();
-		panelSafeZ.setBorder(new TitledBorder(new EtchedBorder(
-				EtchedBorder.LOWERED, null, null), "Safe Z",
-				TitledBorder.LEADING, TitledBorder.TOP, null,
-				new Color(0, 0, 0)));
-		contentPanel.add(panelSafeZ);
-		panelSafeZ.setLayout(new FormLayout(new ColumnSpec[] {
-				FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("38px"),
-				FormFactory.LABEL_COMPONENT_GAP_COLSPEC,
-				ColumnSpec.decode("134px"), }, new RowSpec[] {
-				RowSpec.decode("23px"), RowSpec.decode("28px"), }));
+    @Override
+    public void createBindings() {
+        LengthConverter lengthConverter = new LengthConverter();
 
-		lblSafeZ = new JLabel("Safe Z");
-		panelSafeZ.add(lblSafeZ, "2, 2, left, center");
-
-		textSafeZ = new JTextField();
-		panelSafeZ.add(textSafeZ, "4, 2, left, top");
-		textSafeZ.setColumns(10);
-	}
-
-	@Override
-	public void createBindings() {
-        DoubleConverter doubleConverter = new DoubleConverter(Configuration.get().getLengthDisplayFormat());
-		LengthConverter lengthConverter = new LengthConverter();
-
-		MutableLocationProxy headOffsets = new MutableLocationProxy();
-		bind(UpdateStrategy.READ_WRITE, actuator, "headOffsets", headOffsets,
-				"location");
-		addWrappedBinding(headOffsets, "lengthX", locationX, "text",
-				lengthConverter);
-		addWrappedBinding(headOffsets, "lengthY", locationY, "text",
-				lengthConverter);
-		addWrappedBinding(headOffsets, "lengthZ", locationZ, "text",
-				lengthConverter);
-
-        addWrappedBinding(actuator, "safeZ", textSafeZ, "text", doubleConverter);
-
-        ComponentDecorators.decorateWithAutoSelect(textSafeZ);
+        MutableLocationProxy headOffsets = new MutableLocationProxy();
+        bind(UpdateStrategy.READ_WRITE, actuator, "headOffsets", headOffsets,
+                "location");
+        addWrappedBinding(headOffsets, "lengthX", locationX, "text",
+                lengthConverter);
+        addWrappedBinding(headOffsets, "lengthY", locationY, "text",
+                lengthConverter);
+        addWrappedBinding(headOffsets, "lengthZ", locationZ, "text",
+                lengthConverter);
+        addWrappedBinding(actuator, "safeZ", textFieldSafeZ, "text", lengthConverter);
 
         ComponentDecorators
-				.decorateWithAutoSelectAndLengthConversion(locationX);
-		ComponentDecorators
-				.decorateWithAutoSelectAndLengthConversion(locationY);
-		ComponentDecorators
-				.decorateWithAutoSelectAndLengthConversion(locationZ);
-	}
+                .decorateWithAutoSelectAndLengthConversion(locationX);
+        ComponentDecorators
+                .decorateWithAutoSelectAndLengthConversion(locationY);
+        ComponentDecorators
+                .decorateWithAutoSelectAndLengthConversion(locationZ);
+        ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldSafeZ);
+    }
 }

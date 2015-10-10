@@ -33,17 +33,16 @@ import javax.swing.border.TitledBorder;
 import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
 import org.openpnp.gui.components.ComponentDecorators;
 import org.openpnp.gui.support.AbstractConfigurationWizard;
-import org.openpnp.gui.support.DoubleConverter;
 import org.openpnp.gui.support.LengthConverter;
 import org.openpnp.gui.support.MutableLocationProxy;
 import org.openpnp.machine.reference.ReferenceNozzle;
-import org.openpnp.model.Configuration;
 
-import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
+import com.jgoodies.forms.layout.FormSpecs;
 import com.jgoodies.forms.layout.RowSpec;
 
+@SuppressWarnings("serial")
 public class ReferenceNozzleConfigurationWizard extends
         AbstractConfigurationWizard {
     private final ReferenceNozzle nozzle;
@@ -55,9 +54,7 @@ public class ReferenceNozzleConfigurationWizard extends
     private JPanel panelChanger;
     private JCheckBox chckbxChangerEnabled;
     private JCheckBox chckbxLimitRotationTo;
-    private JPanel panelSafeZ;
-    private JLabel lblSafeZ;
-    private JTextField textSafeZ;
+    private JTextField textFieldSafeZ;
 
     public ReferenceNozzleConfigurationWizard(ReferenceNozzle nozzle) {
         this.nozzle = nozzle;
@@ -68,18 +65,18 @@ public class ReferenceNozzleConfigurationWizard extends
                 TitledBorder.LEADING, TitledBorder.TOP, null,
                 new Color(0, 0, 0)));
         panelOffsets.setLayout(new FormLayout(
-                new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC,
-                        FormFactory.DEFAULT_COLSPEC,
-                        FormFactory.RELATED_GAP_COLSPEC,
-                        FormFactory.DEFAULT_COLSPEC,
-                        FormFactory.RELATED_GAP_COLSPEC,
-                        FormFactory.DEFAULT_COLSPEC,
-                        FormFactory.RELATED_GAP_COLSPEC,
-                        FormFactory.DEFAULT_COLSPEC, }, new RowSpec[] {
-                        FormFactory.RELATED_GAP_ROWSPEC,
-                        FormFactory.DEFAULT_ROWSPEC,
-                        FormFactory.RELATED_GAP_ROWSPEC,
-                        FormFactory.DEFAULT_ROWSPEC, }));
+                new ColumnSpec[] { FormSpecs.RELATED_GAP_COLSPEC,
+                        FormSpecs.DEFAULT_COLSPEC,
+                        FormSpecs.RELATED_GAP_COLSPEC,
+                        FormSpecs.DEFAULT_COLSPEC,
+                        FormSpecs.RELATED_GAP_COLSPEC,
+                        FormSpecs.DEFAULT_COLSPEC,
+                        FormSpecs.RELATED_GAP_COLSPEC,
+                        FormSpecs.DEFAULT_COLSPEC, }, new RowSpec[] {
+                        FormSpecs.RELATED_GAP_ROWSPEC,
+                        FormSpecs.DEFAULT_ROWSPEC,
+                        FormSpecs.RELATED_GAP_ROWSPEC,
+                        FormSpecs.DEFAULT_ROWSPEC, }));
 
         JLabel lblX = new JLabel("X");
         panelOffsets.add(lblX, "2, 2");
@@ -104,58 +101,57 @@ public class ReferenceNozzleConfigurationWizard extends
 
         contentPanel.add(panelOffsets);
         
-        panelSafeZ = new JPanel();
+        JPanel panelSafeZ = new JPanel();
+        panelSafeZ.setBorder(new TitledBorder(null, "Safe Z", TitledBorder.LEADING, TitledBorder.TOP, null, null));
         contentPanel.add(panelSafeZ);
-        panelSafeZ.setBorder(new TitledBorder(new EtchedBorder(
-                EtchedBorder.LOWERED, null, null), "Safe Z",
-                TitledBorder.LEADING, TitledBorder.TOP, null,
-                new Color(0, 0, 0)));
         panelSafeZ.setLayout(new FormLayout(new ColumnSpec[] {
-        		FormFactory.RELATED_GAP_COLSPEC,
-        		FormFactory.DEFAULT_COLSPEC,
-        		FormFactory.LABEL_COMPONENT_GAP_COLSPEC,
-        		ColumnSpec.decode("134px"),},
+        		FormSpecs.RELATED_GAP_COLSPEC,
+        		FormSpecs.DEFAULT_COLSPEC,
+        		FormSpecs.RELATED_GAP_COLSPEC,
+        		FormSpecs.DEFAULT_COLSPEC,},
         	new RowSpec[] {
-        		FormFactory.RELATED_GAP_ROWSPEC,
-        		RowSpec.decode("28px"),}));
+        		FormSpecs.RELATED_GAP_ROWSPEC,
+        		FormSpecs.DEFAULT_ROWSPEC,}));
         
-        lblSafeZ = new JLabel("Safe Z");
-        panelSafeZ.add(lblSafeZ, "2, 2, left, center");
+        JLabel lblSafeZ = new JLabel("Safe Z");
+        panelSafeZ.add(lblSafeZ, "2, 2, right, default");
         
-        textSafeZ = new JTextField();
-        panelSafeZ.add(textSafeZ, "4, 2, left, top");
-        textSafeZ.setColumns(10);
+        textFieldSafeZ = new JTextField();
+        panelSafeZ.add(textFieldSafeZ, "4, 2, fill, default");
+        textFieldSafeZ.setColumns(10);
+        
         
         panelChanger = new JPanel();
         panelChanger.setBorder(new TitledBorder(new EtchedBorder(EtchedBorder.LOWERED, null, null), "Settings", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
         contentPanel.add(panelChanger);
         panelChanger.setLayout(new FormLayout(new ColumnSpec[] {
-                FormFactory.RELATED_GAP_COLSPEC,
-                FormFactory.DEFAULT_COLSPEC,
-                FormFactory.RELATED_GAP_COLSPEC,
+                FormSpecs.RELATED_GAP_COLSPEC,
+                FormSpecs.DEFAULT_COLSPEC,
+                FormSpecs.RELATED_GAP_COLSPEC,
                 ColumnSpec.decode("default:grow"),
-                FormFactory.RELATED_GAP_COLSPEC,
+                FormSpecs.RELATED_GAP_COLSPEC,
                 ColumnSpec.decode("default:grow"),
-                FormFactory.RELATED_GAP_COLSPEC,
+                FormSpecs.RELATED_GAP_COLSPEC,
                 ColumnSpec.decode("default:grow"),
-                FormFactory.RELATED_GAP_COLSPEC,
+                FormSpecs.RELATED_GAP_COLSPEC,
                 ColumnSpec.decode("default:grow"),},
             new RowSpec[] {
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,
-                FormFactory.RELATED_GAP_ROWSPEC,
-                FormFactory.DEFAULT_ROWSPEC,}));
+                FormSpecs.RELATED_GAP_ROWSPEC,
+                FormSpecs.DEFAULT_ROWSPEC,
+                FormSpecs.RELATED_GAP_ROWSPEC,
+                FormSpecs.DEFAULT_ROWSPEC,}));
         
         chckbxChangerEnabled = new JCheckBox("Changer Enabled?");
         panelChanger.add(chckbxChangerEnabled, "2, 2");
         
         chckbxLimitRotationTo = new JCheckBox("Limit Rotation to 180º");
         panelChanger.add(chckbxLimitRotationTo, "2, 4");
+        
+        
     }
 
     @Override
     public void createBindings() {
-        DoubleConverter doubleConverter = new DoubleConverter(Configuration.get().getLengthDisplayFormat());
         LengthConverter lengthConverter = new LengthConverter();
 
         MutableLocationProxy headOffsets = new MutableLocationProxy();
@@ -172,10 +168,7 @@ public class ReferenceNozzleConfigurationWizard extends
                 "selected");
         addWrappedBinding(nozzle, "limitRotation", chckbxLimitRotationTo,
                 "selected");
-
-        addWrappedBinding(nozzle, "safeZ", textSafeZ, "text", doubleConverter);
-
-        ComponentDecorators.decorateWithAutoSelect(textSafeZ);
+        addWrappedBinding(nozzle, "safeZ", textFieldSafeZ, "text", lengthConverter);
 
         ComponentDecorators
                 .decorateWithAutoSelectAndLengthConversion(locationX);
@@ -183,5 +176,6 @@ public class ReferenceNozzleConfigurationWizard extends
                 .decorateWithAutoSelectAndLengthConversion(locationY);
         ComponentDecorators
                 .decorateWithAutoSelectAndLengthConversion(locationZ);
+        ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldSafeZ);
     }
 }
