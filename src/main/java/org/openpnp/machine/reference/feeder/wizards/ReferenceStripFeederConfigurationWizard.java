@@ -23,6 +23,7 @@ package org.openpnp.machine.reference.feeder.wizards;
 
 import java.awt.Color;
 import java.awt.event.ActionEvent;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -43,6 +44,7 @@ import org.openpnp.gui.MainFrame;
 import org.openpnp.gui.components.CameraView;
 import org.openpnp.gui.components.CameraViewActionEvent;
 import org.openpnp.gui.components.CameraViewActionListener;
+import org.openpnp.gui.components.CameraViewFilter;
 import org.openpnp.gui.components.ComponentDecorators;
 import org.openpnp.gui.components.LocationButtonsPanel;
 import org.openpnp.gui.support.AbstractConfigurationWizard;
@@ -62,12 +64,14 @@ import org.openpnp.model.Part;
 import org.openpnp.spi.Camera;
 import org.openpnp.util.OpenCvUtils;
 import org.openpnp.util.VisionUtils;
+import org.openpnp.vision.FluentCv;
 
 import com.google.common.collect.Lists;
 import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.FormSpecs;
 import com.jgoodies.forms.layout.RowSpec;
+import javax.swing.JCheckBox;
 
 @SuppressWarnings("serial")
 public class ReferenceStripFeederConfigurationWizard extends
@@ -144,62 +148,72 @@ public class ReferenceStripFeederConfigurationWizard extends
                 TitledBorder.LEADING, TitledBorder.TOP, null,
                 new Color(0, 0, 0)));
         panelTapeSettings.setLayout(new FormLayout(new ColumnSpec[] {
-                FormSpecs.RELATED_GAP_COLSPEC,
-                FormSpecs.DEFAULT_COLSPEC,
-                FormSpecs.RELATED_GAP_COLSPEC,
-                FormSpecs.DEFAULT_COLSPEC,
-                FormSpecs.RELATED_GAP_COLSPEC,
-                FormSpecs.DEFAULT_COLSPEC,},
-            new RowSpec[] {
-            		FormSpecs.RELATED_GAP_ROWSPEC,
-            		FormSpecs.DEFAULT_ROWSPEC,
-            		FormSpecs.RELATED_GAP_ROWSPEC,
-            		FormSpecs.DEFAULT_ROWSPEC,
-            		FormSpecs.RELATED_GAP_ROWSPEC,
-            		FormSpecs.DEFAULT_ROWSPEC,
-                FormSpecs.RELATED_GAP_ROWSPEC,
-                FormSpecs.DEFAULT_ROWSPEC,
-                FormSpecs.RELATED_GAP_ROWSPEC,
-                FormSpecs.DEFAULT_ROWSPEC,}));
-
-        lblTapeType = new JLabel("Tape Type");
-        panelTapeSettings.add(lblTapeType, "2, 2, right, default");
-
-        comboBoxTapeType = new JComboBox(TapeType.values());
-        panelTapeSettings.add(comboBoxTapeType, "4, 2, fill, default");
-
-        JLabel lblTapeWidth = new JLabel("Tape Width");
-        panelTapeSettings.add(lblTapeWidth, "2, 4");
-
-        textFieldTapeWidth = new JTextField();
-        panelTapeSettings.add(textFieldTapeWidth, "4, 4");
-        textFieldTapeWidth.setColumns(5);
-
-        lblPartPitch = new JLabel("Part Pitch");
-        panelTapeSettings.add(lblPartPitch, "2, 6, right, default");
-
-        textFieldPartPitch = new JTextField();
-        panelTapeSettings.add(textFieldPartPitch, "4, 6");
-        textFieldPartPitch.setColumns(5);
-
-        lblFeedCount = new JLabel("Feed Count");
-        panelTapeSettings.add(lblFeedCount, "2, 8");
-
-        textFieldFeedCount = new JTextField();
-        panelTapeSettings.add(textFieldFeedCount, "4, 8");
-        textFieldFeedCount.setColumns(10);
-
-        btnResetFeedCount = new JButton(new AbstractAction("Reset") {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                textFieldFeedCount.setText("0");
-                applyAction.actionPerformed(e);
-            }
-        });
-        panelTapeSettings.add(btnResetFeedCount, "6, 8");
+        		FormSpecs.RELATED_GAP_COLSPEC,
+        		FormSpecs.DEFAULT_COLSPEC,
+        		FormSpecs.RELATED_GAP_COLSPEC,
+        		FormSpecs.DEFAULT_COLSPEC,
+        		FormSpecs.RELATED_GAP_COLSPEC,
+        		FormSpecs.DEFAULT_COLSPEC,
+        		FormSpecs.RELATED_GAP_COLSPEC,
+        		FormSpecs.DEFAULT_COLSPEC,
+        		FormSpecs.RELATED_GAP_COLSPEC,
+        		FormSpecs.DEFAULT_COLSPEC,
+        		FormSpecs.RELATED_GAP_COLSPEC,
+        		FormSpecs.DEFAULT_COLSPEC,},
+        	new RowSpec[] {
+        		FormSpecs.RELATED_GAP_ROWSPEC,
+        		FormSpecs.DEFAULT_ROWSPEC,
+        		FormSpecs.RELATED_GAP_ROWSPEC,
+        		FormSpecs.DEFAULT_ROWSPEC,
+        		FormSpecs.RELATED_GAP_ROWSPEC,
+        		FormSpecs.DEFAULT_ROWSPEC,
+        		FormSpecs.RELATED_GAP_ROWSPEC,
+        		FormSpecs.DEFAULT_ROWSPEC,}));
         
         btnAutoSetup = new JButton(autoSetup);
-        panelTapeSettings.add(btnAutoSetup, "4, 10");
+        panelTapeSettings.add(btnAutoSetup, "2, 2, 11, 1");
+
+        lblTapeType = new JLabel("Tape Type");
+        panelTapeSettings.add(lblTapeType, "2, 4, right, default");
+
+        comboBoxTapeType = new JComboBox(TapeType.values());
+        panelTapeSettings.add(comboBoxTapeType, "4, 4, fill, default");
+        
+                JLabel lblTapeWidth = new JLabel("Tape Width");
+                panelTapeSettings.add(lblTapeWidth, "8, 4, right, default");
+        
+                textFieldTapeWidth = new JTextField();
+                panelTapeSettings.add(textFieldTapeWidth, "10, 4");
+                textFieldTapeWidth.setColumns(5);
+        
+                lblPartPitch = new JLabel("Part Pitch");
+                panelTapeSettings.add(lblPartPitch, "2, 6, right, default");
+        
+                textFieldPartPitch = new JTextField();
+                panelTapeSettings.add(textFieldPartPitch, "4, 6");
+                textFieldPartPitch.setColumns(5);
+        
+                lblFeedCount = new JLabel("Feed Count");
+                panelTapeSettings.add(lblFeedCount, "8, 6, right, default");
+        
+                textFieldFeedCount = new JTextField();
+                panelTapeSettings.add(textFieldFeedCount, "10, 6");
+                textFieldFeedCount.setColumns(10);
+        
+                btnResetFeedCount = new JButton(new AbstractAction("Reset") {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        textFieldFeedCount.setText("0");
+                        applyAction.actionPerformed(e);
+                    }
+                });
+                panelTapeSettings.add(btnResetFeedCount, "12, 6");
+        
+        lblUseVision = new JLabel("Use Vision?");
+        panelTapeSettings.add(lblUseVision, "2, 8");
+        
+        chckbxUseVision = new JCheckBox("");
+        panelTapeSettings.add(chckbxUseVision, "4, 8");
 
         panelLocations = new JPanel();
         contentPanel.add(panelLocations);
@@ -234,7 +248,7 @@ public class ReferenceStripFeederConfigurationWizard extends
         panelLocations.add(lblZ_1, "8, 2");
 
         JLabel lblFeedStartLocation = new JLabel("Reference Hole Location");
-        lblFeedStartLocation.setToolTipText("The location of a tape hole 2mm from the first part in the direction of the second part.");
+        lblFeedStartLocation.setToolTipText("The location of the first tape hole past the first part in the direction of more parts.");
         panelLocations.add(lblFeedStartLocation, "2, 4, right, default");
 
         textFieldFeedStartX = new JTextField();
@@ -317,6 +331,8 @@ public class ReferenceStripFeederConfigurationWizard extends
                 "text", lengthConverter);
         addWrappedBinding(feedEndLocation, "lengthZ", textFieldFeedEndZ,
                 "text", lengthConverter);
+        
+        addWrappedBinding(feeder, "visionEnabled", chckbxUseVision, "selected");
 
         ComponentDecorators.decorateWithAutoSelect(textFieldLocationRotation);
         ComponentDecorators
@@ -344,6 +360,23 @@ public class ReferenceStripFeederConfigurationWizard extends
         	CameraView cameraView = MainFrame.cameraPanel.getSelectedCameraView();
         	cameraView.addActionListener(autoSetupPart1Clicked);
         	cameraView.setText("Click on the center of the first part in the tape.");
+        	
+        	cameraView.setCameraViewFilter(new CameraViewFilter() {
+				@Override
+				public BufferedImage filterCameraImage(Camera camera, BufferedImage image) {
+					return new FluentCv()
+						.toMat(image, "original")
+						.toGray()
+						.thresholdOtsu(false)
+						.gaussianBlur(9)
+						.houghCircles(camera, 
+			                    feeder.getHoleDiameter().multiply(0.9), 
+			                    feeder.getHoleDiameter().multiply(1.1), 
+			                    feeder.getHolePitch().multiply(0.9))
+						.drawCircles("original")
+						.toBufferedImage();
+				}
+			});
         }
     };
     
@@ -358,12 +391,8 @@ public class ReferenceStripFeederConfigurationWizard extends
 				public Void call() throws Exception {
 					cameraView.setText("Checking first part...");
 		        	camera.moveTo(action.getLocation(), 1.0);
-		        	Thread.sleep(750);
-		            part1HoleLocations = OpenCvUtils.houghCircles(
-		                    camera, 
-		                    feeder.getHoleDiameter().multiply(0.9), 
-		                    feeder.getHoleDiameter().multiply(1.1), 
-		                    feeder.getHolePitch().multiply(0.9));
+		        	Thread.sleep(100);
+		        	part1HoleLocations = findHoles(camera);
 		            // Need to handle the special case where the first two holes we find are not the
 		            // reference hole and next hole. This can happen if another tape is close by and
 		            // one of it's holes is detected as either of the holes.
@@ -392,12 +421,8 @@ public class ReferenceStripFeederConfigurationWizard extends
 				public Void call() throws Exception {
 					cameraView.setText("Checking second part...");
 		        	camera.moveTo(action.getLocation(), 1.0);
-		        	Thread.sleep(750);
-		            List<Location> part2HoleLocations = OpenCvUtils.houghCircles(
-		                    camera, 
-		                    feeder.getHoleDiameter().multiply(0.9), 
-		                    feeder.getHoleDiameter().multiply(1.1), 
-		                    feeder.getHolePitch().multiply(0.9));
+		        	Thread.sleep(100);
+		        	List<Location> part2HoleLocations = findHoles(camera);
 		            
 		        	List<Location> referenceHoles = deriveReferenceHoles(
 		        			part1HoleLocations, 
@@ -405,6 +430,7 @@ public class ReferenceStripFeederConfigurationWizard extends
 		        	final Location referenceHole1 = referenceHoles.get(0);
 		        	final Location referenceHole2 = referenceHoles.get(1);
 		        	Length partPitch = referenceHole1.getLinearLengthTo(referenceHole2);
+		        	
 		        	partPitch.setValue(Math.round(partPitch.getValue()));
 		        	feeder.setReferenceHoleLocation(referenceHole1);
 		        	feeder.setLastHoleLocation(referenceHole2);
@@ -429,15 +455,32 @@ public class ReferenceStripFeederConfigurationWizard extends
 		        	feeder.setFeedCount(1);
 		        	camera.moveTo(feeder.getPickLocation(), 1.0);
 		        	feeder.setFeedCount(0);
+		        	
 		        	cameraView.setText("Setup complete!");
 		        	Thread.sleep(1500);
 		        	cameraView.setText(null);
+		        	cameraView.setCameraViewFilter(null);
 
 		        	return null;
 				}
 			});
 		}
 	};
+	
+	private List<Location> findHoles(Camera camera) {
+	    List<Location> holeLocations = new ArrayList<>();
+		new FluentCv()
+			.toMat(camera.capture())
+			.toGray()
+			.thresholdOtsu(false)
+			.gaussianBlur(9)
+			.houghCircles(camera, 
+                feeder.getHoleDiameter().multiply(0.9), 
+                feeder.getHoleDiameter().multiply(1.1), 
+                feeder.getHolePitch().multiply(0.9))
+			.circlesToLocations(camera, holeLocations);
+	    return holeLocations;
+	}
 	
 	private List<Location> deriveReferenceHoles(List<Location> part1HoleLocations, List<Location> part2HoleLocations) {
 		// We are only interested in the pair of holes closest to each part
@@ -468,4 +511,6 @@ public class ReferenceStripFeederConfigurationWizard extends
         	cameraView.removeActionListener(autoSetupPart2Clicked);
         }
     };
+    private JCheckBox chckbxUseVision;
+    private JLabel lblUseVision;
 }
