@@ -1156,7 +1156,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
             sendJsonCommand(String.format("{'dimre':%f}", deltaCalculator.getrE()));
             sendJsonCommand(String.format("{'dimrf':%f}", deltaCalculator.getrF()));
             sendJsonCommand(String.format("{'dimspr':%f}", 0f));
-            sendJsonCommand(String.format("{'dimhz':%f}", nozzle.getSafeZ().getValue() - nozzle.getHeadOffsets().getZ()));
+            sendJsonCommand(String.format("{'dimhzl':%f}", -10f));
             sendJsonCommand(String.format("{'syspb':%d}", 53));
             sendJsonCommand(String.format("{'syspu':%d}", 1));
             
