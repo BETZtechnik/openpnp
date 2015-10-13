@@ -228,7 +228,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	    		enableUpLookingRingLight(false);   		// Turn off up-looking LED ring light
 	    		if (powerSupplyOn)
 	    		{
-//			        home(null);                        	// home the machine
+			        home(null);                        	// home the machine
                     enableVacuumPump(false);            // Turn the vacuum pump OFF
                     enableDispenser(false);
 					setXyzMotorEnable(false);  			// Disable power for XYZ stepper motors
@@ -258,23 +258,19 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 
     @Override
 	public void home(ReferenceHead head) throws Exception {
+    	Camera camera = Configuration
+    			.get()
+    			.getMachine()
+    			.getDefaultHead()
+    			.getDefaultCamera();
+    	
+    	// If we've previously homed we want to make sure the head is not in
+    	// a position that will cause arm collision if we home again. So we
+    	// try to move back to center at a safe height before homing.
         if (homed) {
-            Nozzle nozzle;
-            if (head == null) {
-                nozzle = Configuration
-                    .get()
-                    .getMachine()
-                    .getHeads()
-                    .get(0)
-                    .getNozzles()
-                    .get(0);
-            }
-            else {
-                nozzle = head.getNozzles().get(0);
-            }
-            if (nozzle.getLocation().getLinearDistanceTo(0, 0) > 60) {
-                nozzle.moveToSafeZ(1.0);
-                nozzle.moveTo(nozzle.getLocation().derive(0d, 0d, null, null), 1.0);
+            if (camera.getLocation().getLinearDistanceTo(0, 0) > 60) {
+            	camera.moveToSafeZ(1.0);
+            	camera.moveTo(camera.getLocation().derive(0d, 0d, null, null), 1.0);
             }
         }
         
