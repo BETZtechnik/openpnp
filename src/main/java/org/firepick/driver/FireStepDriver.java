@@ -163,6 +163,10 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 ReferenceMachine machine = (ReferenceMachine) configuration.getMachine();
                 machine.registerFeederClass(CarouselFeeder.class);
                 
+                if (carouselDrivers.isEmpty()) {
+                	carouselDrivers.add(new CarouselDriver());
+                }
+                
                 for (CarouselDriver driver : carouselDrivers) {
                     driver.setMachineDriver(FireStepDriver.this);
                 }

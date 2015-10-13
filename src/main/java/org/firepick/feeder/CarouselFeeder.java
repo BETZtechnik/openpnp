@@ -60,15 +60,14 @@ public class CarouselFeeder extends ReferenceFeeder {
         }
         
         // move the camera over the locating point and capture an image
-        Camera camera = nozzle.getHead().getCameras().get(0);
+        Camera camera = nozzle.getHead().getDefaultCamera();
         MovableUtils.moveToLocationAtSafeZ(camera, location, 1.0);
 
         // find the matching result closest to the camera
         // move to it
         // repeat
         for (int i = 0; i < 3; i++) {
-            Thread.sleep(500);
-            BufferedImage image = camera.capture();
+            BufferedImage image = camera.settleAndCapture();
             FireSightResult result = FireSight.fireSight(image, "firesight/multiPartDetect.json");
             List<RotatedRect> rects = FireSight
                     .parseRotatedRects(result.model.get("filtered")
