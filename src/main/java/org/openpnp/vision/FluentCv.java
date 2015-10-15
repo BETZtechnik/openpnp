@@ -1,3 +1,56 @@
+/*
+ 	Copyright (C) 2015 Jason von Nieda <jason@vonnieda.org>
+ 	
+ 	This file is part of OpenPnP.
+ 	
+ 	You may use this file under either the GPLv3 License or the MIT
+ 	License at your preference. Functions in OpenPnP that this
+ 	file rely on are also available under these terms. See the two
+ 	licenses below.
+ 	
+	GPLv3 License Terms
+	-------------------
+	
+	OpenPnP is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    OpenPnP is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with OpenPnP.  If not, see <http://www.gnu.org/licenses/>.
+ 	
+ 	For more information about OpenPnP visit http://openpnp.org
+ 	
+ 	
+ 	MIT License Terms
+ 	-----------------
+ 	
+ 	The MIT License (MIT)
+
+	Permission is hereby granted, free of charge, to any person obtaining a copy
+	of this software and associated documentation files (the "Software"), to deal
+	in the Software without restriction, including without limitation the rights
+	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	copies of the Software, and to permit persons to whom the Software is
+	furnished to do so, subject to the following conditions:
+	
+	The above copyright notice and this permission notice shall be included in
+	all copies or substantial portions of the Software.
+	
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+	THE SOFTWARE.
+*/
+
 package org.openpnp.vision;
 
 
@@ -7,13 +60,9 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Random;
-import java.util.Set;
 
 import javax.imageio.ImageIO;
 
@@ -21,7 +70,9 @@ import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
+import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
@@ -37,17 +88,51 @@ import org.openpnp.util.VisionUtils;
  * an operation the result of the operation will be stored and can be
  * recalled back into the current Mat.
  * 
- *  Heavily influenced by FireSight by Karl Lew
- *  https://github.com/firepick1/FireSight
+ * Heavily influenced by FireSight by Karl Lew
+ * https://github.com/firepick1/FireSight
+ * 
+ * In the spirit of FireSight, this code is licensed differently from the
+ * rest of OpenPnP. Please see the license header above.
+ * 
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
+ * This API is still under heavy development and is likely to change
+ * significantly in the near future.  
  *  
- *  TODO: Rethink operations that return or process data points versus
- *  images. Perhaps these should require a tag to work with and
- *  leave the image unchanged.
+ * TODO: Rethink operations that return or process data points versus
+ * images. Perhaps these should require a tag to work with and
+ * leave the image unchanged.
+ * 
+ * There is a bit of a divergence right now between how things like
+ * contours and rotated rects are handled versus circles. Circles
+ * already have a Mat representation that we can kind of coerce along
+ * the pipeline where contours do not (List<MatOfPoint>). We need to
+ * pick one of the methods and stick with it, doing translation where
+ * needed.
+ * 
+ * Keeping things in Mat does give the benefit of not moving too much
+ * memory between OpenCv and Java. 
  */
 public class FluentCv {
     static {
         nu.pattern.OpenCV.loadShared();
         System.loadLibrary(org.opencv.core.Core.NATIVE_LIBRARY_NAME);
+    }
+    
+    public enum ColorCode {
+    	Bgr2Gray(Imgproc.COLOR_BGR2GRAY),
+    	Rgb2Gray(Imgproc.COLOR_RGB2GRAY),
+    	Gray2Bgr(Imgproc.COLOR_GRAY2BGR),
+    	Gray2Rgb(Imgproc.COLOR_GRAY2RGB);
+    	
+    	private int code;
+    	
+    	ColorCode(int code) {
+    		this.code = code;
+    	}
+    	
+    	public int getCode() {
+    		return code;
+    	}
     }
 
     private LinkedHashMap<String, Mat> stored = new LinkedHashMap<>();
@@ -79,20 +164,41 @@ public class FluentCv {
 		return store(mat, tag);
 	}
 	
-	public FluentCv cvtColor(int code, String... tag) {
-		Imgproc.cvtColor(mat, mat, code);
+	public FluentCv cvtColor(ColorCode code, String... tag) {
+		Imgproc.cvtColor(mat, mat, code.getCode());
 		return store(mat, tag);
 	}
 	
-	public FluentCv thresholdOtsu(boolean invert, String... tag) {
+	/**
+	 * Apply a threshold to the Mat. If the threshold value is 0 then the Otsu
+	 * flag will be added and the threshold value ignored. Otsu performs
+	 * automatic determination of the threshold value by sampling the
+	 * image.
+	 * @param threshold
+	 * @param tag
+	 * @return
+	 */
+	public FluentCv threshold(double threshold, String... tag) {
+		return threshold(threshold, false, tag);
+	}
+	
+	public FluentCv threshold(double threshold, boolean invert, String... tag) {
+		int type = invert ? Imgproc.THRESH_BINARY_INV : Imgproc.THRESH_BINARY;
+		if (threshold == 0) {
+			type |= Imgproc.THRESH_OTSU;
+		}
     	Imgproc.threshold(
     			mat, 
     			mat,
-    			0,
+    			threshold,
     			255, 
-    			(invert ? Imgproc.THRESH_BINARY_INV : Imgproc.THRESH_BINARY) | Imgproc.THRESH_OTSU);
+    			type);
 		return store(mat, tag);
 	}
+
+	public FluentCv thresholdAdaptive(String...tag) {
+		return thresholdAdaptive(false, tag);
+	}	
 	
 	public FluentCv thresholdAdaptive(boolean invert, String...tag) {
     	Imgproc.adaptiveThreshold(
@@ -145,7 +251,6 @@ public class FluentCv {
     		double[] circle = mat.get(0, i);
     		double x = circle[0];
     		double y = circle[1];
-    		double radius = circle[2];
     		points.add(new Point(x, y));
     	}
     	return this;
@@ -210,6 +315,10 @@ public class FluentCv {
 	public FluentCv recall(String tag) {
 		mat = get(tag);
 		return this;
+	}
+	
+	public FluentCv store(String tag) {
+		return store(mat, tag);
 	}
 	
 	public FluentCv write(File file) throws Exception {
@@ -318,8 +427,6 @@ public class FluentCv {
 	 * @return
 	 */
 	public FluentCv filterCirclesToLine(double maxDistance, String... tag) {
-		// fitLine doesn't like when you give it a zero length array, so just
-		// bail if there are not enough points to make a line.
 		if (this.mat.cols() < 2) {
 			return store(this.mat, tag);
 		}
@@ -334,7 +441,7 @@ public class FluentCv {
     		points.add(new Point(x, y));
     	}
     	
-		Point[] line = ransac(points, 100, maxDistance);
+		Point[] line = Ransac.ransac(points, 100, maxDistance);
     	Point a = line[0];
     	Point b = line[1];
 		
@@ -361,6 +468,89 @@ public class FluentCv {
 	
 	public Mat mat() {
 		return mat;
+	}
+	
+	public FluentCv mat(Mat mat, String... tag) {
+		return store(mat, tag);
+	}
+	
+	/**
+	 * Calculate the absolute difference between the previously
+	 * stored Mat called source1 and the current Mat.
+	 * @param source1
+	 * @param tag
+	 */
+	public FluentCv absDiff(String source1, String... tag) {
+		Core.absdiff(get(source1), mat, mat);
+		return store(mat, tag);
+	}
+	
+	public FluentCv canny(double threshold1, double threshold2, String... tag) {
+		Imgproc.Canny(mat, mat, threshold1, threshold2);
+		return store(mat, tag);
+	}
+	
+	public FluentCv findContours(List<MatOfPoint> contours, String... tag) {
+		Mat hierarchy = new Mat();
+		Imgproc.findContours(mat, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_NONE);
+		return store(mat, tag);
+	}
+	
+	public FluentCv drawContours(List<MatOfPoint> contours, Color color, int thickness, String... tag) {
+		if (color == null) {
+			for (int i = 0; i < contours.size(); i++) {
+				Imgproc.drawContours(mat, contours, i, colorToScalar(indexedColor(i)), thickness);
+			}
+		}
+		else {
+			Imgproc.drawContours(mat, contours, -1, colorToScalar(color), thickness);
+		}
+		return store(mat, tag);
+	}
+	
+	public FluentCv filterContoursByArea(List<MatOfPoint> contours, double areaMin, double areaMax) {
+		for (Iterator<MatOfPoint> i = contours.iterator(); i.hasNext(); ) {
+			MatOfPoint contour = i.next();
+			double area = Imgproc.contourArea(contour);
+			if (area < areaMin || area > areaMax) {
+				i.remove();
+			}
+		}
+		return this;
+	}
+	
+	public FluentCv drawRects(List<RotatedRect> rects, Color color, int thickness, String... tag) {
+		for (int i = 0; i < rects.size(); i++) {
+			RotatedRect rect = rects.get(i);
+			if (color == null) {
+				drawRotatedRect(mat, rect, indexedColor(i), thickness);
+			}
+			else {
+				drawRotatedRect(mat, rect, color, thickness);
+			}
+		}
+		return store(mat, tag);
+	}
+	
+	public FluentCv getContourRects(List<MatOfPoint> contours, List<RotatedRect> rects) {
+		for (int i = 0; i < contours.size(); i++) {
+			MatOfPoint2f contour_ = new MatOfPoint2f();
+		    contours.get(i).convertTo(contour_, CvType.CV_32FC2);
+			RotatedRect rect = Imgproc.minAreaRect(contour_);
+			rects.add(rect);
+		}
+		return this;
+	}
+	
+	public FluentCv filterRectsByArea(List<RotatedRect> rects, double areaMin, double areaMax) {
+		for (Iterator<RotatedRect> i = rects.iterator(); i.hasNext(); ) {
+			RotatedRect rect = i.next();
+			double area = rect.size.width * rect.size.height;
+			if (area < areaMin || area > areaMax) {
+				i.remove();
+			}
+		}
+		return this;
 	}
 	
 	private void checkCamera() {
@@ -395,6 +585,22 @@ public class FluentCv {
 				color.getGreen(), 
 				color.getRed(), 
 				255);
+	}
+	
+	/**
+	 * Return a Color from an imaginary list of colors starting at index 0
+	 * and extending on to Integer.MAX_VALUE. Can be used to pick a different
+	 * color for each object in a list. Colors are not guaranteed to be unique
+	 * but successive colors will be significantly different from each other.
+	 * @param i
+	 * @return
+	 */
+	private static Color indexedColor(int i) {
+		float h = (i * 59) % 360;
+		float s = Math.max((i * i) % 100, 80);
+		float l = Math.max((i * i) % 100, 50);
+		Color color = new HslColor(h, s, l).getRGB();
+		return color;
 	}
 	
     private static BufferedImage convertBufferedImage(BufferedImage src, int type) {
@@ -444,131 +650,14 @@ public class FluentCv {
 		}
 		Core.line(img, p, q, colorToScalar(color));
 	}
-
-	/*
-	 * http://users.utcluj.ro/~igiosan/Resources/PRS/L1/lab_01e.pdf
-	 * http://cs.gmu.edu/~kosecka/cs682/lect-fitting.pdf
-	 * http://introcs.cs.princeton.edu/java/36inheritance/LeastSquares.java.html
-	 */
-	public static Point[] ransac(List<Point> points, int maxIterations, double threshold) {
-		Point bestA = null, bestB = null;
-		int bestInliers = 0;
-		for (int i = 0; i < maxIterations; i++) {
-			// take a random sample of two points
-			Collections.shuffle(points);
-			Point a = points.get(0);
-			Point b = points.get(1);
-			// find the inliers
-			int inliers = 0;
-			for (Point p : points) {
-				double distance = pointToLineDistance(a, b, p);
-				if (distance <= threshold) {
-					inliers++;
-				}
-			}
-			if (inliers > bestInliers) {
-				bestA = a;
-				bestB = b;
-				bestInliers = inliers;
-			}
-		}
-		return new Point[] { bestA, bestB };
-	}
 	
-	// TODO: This currently seems to give much worse results than ransac. Figure out why.
-	public static List<RansacLine> multiRansac(List<Point> points, int maxIterations, double threshold) {
-		Random random = new Random();
-		Set<RansacLine> lines = new HashSet<>();
-		for (int i = 0; i < maxIterations; i++) {
-			// take a random sample of two points
-			Point a = points.get(random.nextInt(points.size()));
-			Point b = points.get(random.nextInt(points.size()));
-			RansacLine line = new RansacLine(a, b, 0);
-			// if we have already processed this pair, skip it
-			if (lines.contains(line)) {
-				continue;
-			}
-			// add the result
-			lines.add(line);
-			// find the inliers
-			for (Point p : points) {
-				double distance = pointToLineDistance(a, b, p);
-				if (distance <= threshold) {
-					line.inliers++;
-				}
-			}
-		}
-		List<RansacLine> results = new ArrayList<>(lines);
-		Collections.sort(results, new Comparator<RansacLine>() {
-			@Override
-			public int compare(RansacLine o1, RansacLine o2) {
-				return o2.inliers - o1.inliers;
-			}
-		});
-		return results;
+	private static void drawRotatedRect(Mat mat, RotatedRect rect, Color color, int thickness) {
+		// From: http://stackoverflow.com/questions/23327502/opencv-how-to-draw-minarearect-in-java
+		Point points[] = new Point[4];
+	    rect.points(points);
+	    Scalar color_ = colorToScalar(color);
+	    for(int j = 0; j < 4; ++j) {
+	        Core.line(mat, points[j], points[(j + 1) % 4], color_, thickness);
+	    }		
 	}
-	
-	public static class RansacLine {
-		public Point a;
-		public Point b;
-		public transient int inliers;
-		
-		public RansacLine(Point a, Point b, int inliers) {
-			this.a = a;
-			this.b = b;
-			this.inliers = inliers;
-		}
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + ((a == null) ? 0 : a.hashCode());
-			result = prime * result + ((b == null) ? 0 : b.hashCode());
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			RansacLine other = (RansacLine) obj;
-			if (a == null) {
-				if (other.a != null)
-					return false;
-			} else if (!a.equals(other.a))
-				return false;
-			if (b == null) {
-				if (other.b != null)
-					return false;
-			} else if (!b.equals(other.b))
-				return false;
-			return true;
-		}
-
-		@Override
-		public String toString() {
-			return "RansacLine [a=" + a + ", b=" + b + ", inliers=" + inliers + "]";
-		}
-	}
-	
-    public static void main(String[] args) throws Exception {
-    	List<Point> points = new ArrayList<>();
-		FluentCv cv = new FluentCv()
-			.read(new File("/Users/jason/Desktop/test.png"), "original")
-			.toGray()
-			.gaussianBlur(9)
-			.houghCircles(28, 32, 10, "hough")
-			.drawCircles("original", Color.red, "unfiltered")
-			.recall("hough")
-			.filterCirclesToLine(10)
-			.circlesToPoints(points)
-			.drawCircles("unfiltered", Color.green)
-			.write(new File("/Users/jason/Desktop/test_out.png"));
-    }
-    
 }
