@@ -140,7 +140,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
     private String connectedVersion;
     private LinkedBlockingQueue<JsonObject> responseQueue = new LinkedBlockingQueue<>();
     private JsonParser parser = new JsonParser();
-    
+    private Tmc2130 tmc2130 = new Tmc2130(this);
 	/*
 	 * Stores whether or not the machine has been homed. If it has been homed
 	 * and we are disabling the machine, before homing again we move to zero
