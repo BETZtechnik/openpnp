@@ -174,6 +174,10 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         });
 	}
 	
+	public Tmc2130 getTmc2130() {
+		return tmc2130;
+	}
+	
 	@Commit
 	private void commit() {
 	    if (barycentricCalibration == null) {

@@ -22,6 +22,7 @@ along with OpenPnP.  If not, see <http://www.gnu.org/licenses/>.
 package org.firepick.driver.wizards;
 
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyAdapter;
@@ -31,8 +32,11 @@ import java.util.List;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
+import javax.swing.ComboBoxModel;
+import javax.swing.DefaultComboBoxModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -44,8 +48,14 @@ import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
 
 import org.firepick.driver.FireStepDriver;
+import org.firepick.driver.Tmc2130;
+import org.firepick.driver.Tmc2130.Freewheel;
+import org.firepick.driver.Tmc2130.Mres;
+import org.firepick.driver.Tmc2130.Pwmfreq;
+import org.firepick.driver.Tmc2130.Tbl;
 import org.firepick.kinematics.RotatableDeltaKinematicsCalculator;
 import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
+import org.jdesktop.beansbinding.Converter;
 import org.openpnp.gui.components.ComponentDecorators;
 import org.openpnp.gui.components.LocationButtonsPanel;
 import org.openpnp.gui.support.DoubleConverter;
@@ -65,28 +75,16 @@ import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.FormSpecs;
 import com.jgoodies.forms.layout.RowSpec;
-import java.awt.FlowLayout;
-import java.awt.GridBagLayout;
-import java.awt.GridBagConstraints;
-import java.awt.Insets;
-import javax.swing.SwingConstants;
-import javax.swing.JSlider;
-import javax.swing.JComboBox;
-import javax.swing.DefaultComboBoxModel;
-import org.firepick.driver.Tmc2130.Pwmfreq;
-import org.firepick.driver.Tmc2130.Freewheel;
-import org.firepick.driver.Tmc2130.Tbl;
-import org.firepick.driver.Tmc2130.Mres;
-import java.awt.Font;
+import java.awt.event.ActionListener;
 
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
     private List<String> history = new ArrayList<String>();
     private int historyIndex = 0;
     
-    public FireStepDriverWizard(FireStepDriver driver) {
-        super(driver);
-        this.driver = driver;
+    public FireStepDriverWizard(FireStepDriver driver_) {
+        super(driver_);
+        this.driver = driver_;
         
         JPanel panelDelta = new JPanel();
         panelDelta.setBorder(new TitledBorder(null, "Delta Settings", TitledBorder.LEADING, TitledBorder.TOP, null, null));
@@ -293,11 +291,21 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblNewLabel_46 = new JLabel("GCONF.en_pwm_mode");
         panelTmc2130.add(lblNewLabel_46, "4, 2");
         
-        JCheckBox chkTmcGconfEnpwmmode = new JCheckBox("StealthChop");
+        chkTmcGconfEnpwmmode = new JCheckBox("StealthChop");
         chkTmcGconfEnpwmmode.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcGconfEnpwmmode, "6, 2");
         
         JButton btnTmcGconfWrite = new JButton("Write GCONF");
+        btnTmcGconfWrite.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+            		driver.getTmc2130().setGconf();
+        		}
+        		catch (Exception e1) {
+        			e1.printStackTrace();
+        		}
+        	}
+        });
         panelTmc2130.add(btnTmcGconfWrite, "8, 2, 1, 2");
         
         JLabel lblNewLabel_47 = new JLabel("stealthChop voltage PWM mode enabled (depending on velocity thresholds).");
@@ -307,7 +315,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblGconfsmallhysteresis = new JLabel("GCONF.small_hysteresis");
         panelTmc2130.add(lblGconfsmallhysteresis, "4, 3");
         
-        JComboBox cmbTmcGconfSh = new JComboBox();
+        cmbTmcGconfSh = new JComboBox();
         cmbTmcGconfSh.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcGconfSh.setModel(new DefaultComboBoxModel(new String[] {"0 = 1/16", "1 = 1/32"}));
         panelTmc2130.add(cmbTmcGconfSh, "6, 3, fill, default");
@@ -322,7 +330,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblGstatreset = new JLabel("GSTAT.reset");
         panelTmc2130.add(lblGstatreset, "4, 4");
         
-        JCheckBox chkTmcGstatReset = new JCheckBox("Reset");
+        chkTmcGstatReset = new JCheckBox("Reset");
         chkTmcGstatReset.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcGstatReset, "6, 4");
         
@@ -336,7 +344,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblGstatdrverr = new JLabel("GSTAT.drv_err");
         panelTmc2130.add(lblGstatdrverr, "4, 5");
         
-        JCheckBox chkTmcGstatDrvErr = new JCheckBox("Driver error");
+        chkTmcGstatDrvErr = new JCheckBox("Driver error");
         chkTmcGstatDrvErr.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcGstatDrvErr, "6, 5");
         
@@ -347,7 +355,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblGstatuvcp = new JLabel("GSTAT.uv_cp");
         panelTmc2130.add(lblGstatuvcp, "4, 6");
         
-        JCheckBox chkTmcGstatUvcp = new JCheckBox("Undervoltage");
+        chkTmcGstatUvcp = new JCheckBox("Undervoltage");
         chkTmcGstatUvcp.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcGstatUvcp, "6, 6");
         
@@ -380,12 +388,22 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblTmcIhold = new JLabel("IHOLD_RUN.IHOLD");
         panelTmc2130.add(lblTmcIhold, "4, 8");
         
-        JComboBox cmbTmcIhrIhold = new JComboBox();
+        cmbTmcIhrIhold = new JComboBox();
         cmbTmcIhrIhold.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcIhrIhold.setModel(new DefaultComboBoxModel(new String[] {"0 = 1/32", "1 = 2/32", "2 = 3/32", "3 = 4/32", "4 = 5/32", "5 = 6/32", "6 = 7/32", "7 = 8/32", "8 = 9/32", "9 = 10/32", "10 = 11/32", "11 = 12/32", "12 = 13/32", "13 = 14/32", "14 = 15/32", "15 = 16/32", "16 = 17/32", "17 = 18/32", "18 = 19/32", "19 = 20/32", "20 = 21/32", "21 = 22/32", "22 = 23/32", "23 = 24/32", "24 = 25/32", "25 = 26/32", "26 = 27/32", "27 = 28/32", "28 = 29/32", "29 = 30/32", "30 = 31/32", "31 = 32/32"}));
         panelTmc2130.add(cmbTmcIhrIhold, "6, 8, fill, default");
         
         JButton btnTmcIhrWrite = new JButton("Write IHOLD_DELAY");
+        btnTmcIhrWrite.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().setIhr();
+				} catch (Exception e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcIhrWrite, "8, 8, 1, 3");
         
         JLabel lblIholdBlahBlah = new JLabel("Standstill current");
@@ -395,7 +413,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblTmcIrun = new JLabel("IHOLD_RUN.IRUN");
         panelTmc2130.add(lblTmcIrun, "4, 9");
         
-        JComboBox cmbTmcIhrIrun = new JComboBox();
+        cmbTmcIhrIrun = new JComboBox();
         cmbTmcIhrIrun.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcIhrIrun.setModel(new DefaultComboBoxModel(new String[] {"0 = 1/32", "1 = 2/32", "2 = 3/32", "3 = 4/32", "4 = 5/32", "5 = 6/32", "6 = 7/32", "7 = 8/32", "8 = 9/32", "9 = 10/32", "10 = 11/32", "11 = 12/32", "12 = 13/32", "13 = 14/32", "14 = 15/32", "15 = 16/32", "16 = 17/32", "17 = 18/32", "18 = 19/32", "19 = 20/32", "20 = 21/32", "21 = 22/32", "22 = 23/32", "23 = 24/32", "24 = 25/32", "25 = 26/32", "26 = 27/32", "27 = 28/32", "28 = 29/32", "29 = 30/32", "30 = 31/32", "31 = 32/32"}));
         panelTmc2130.add(cmbTmcIhrIrun, "6, 9, fill, default");
@@ -407,7 +425,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblTmcIholdDelay = new JLabel("IHOLD_RUN.IHOLD_DELAY");
         panelTmc2130.add(lblTmcIholdDelay, "4, 10");
         
-        JComboBox cmbTmcIhrIholddelay = new JComboBox();
+        cmbTmcIhrIholddelay = new JComboBox();
         cmbTmcIhrIholddelay.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcIhrIholddelay.setModel(new DefaultComboBoxModel(new String[] {"0 = Instant power-down", "1 = 20 milliseconds", "2 = 40 milliseconds", "3 = 61 milliseconds", "4 = 81 milliseconds", "5 = 101 milliseconds", "6 = 121 milliseconds", "7 = 141 milliseconds", "8 = 161 milliseconds", "9 = 181 milliseconds", "10 = 202 milliseconds", "11 = 222 milliseconds", "12 = 242 milliseconds", "13 = 262 milliseconds", "14 = 282 milliseconds", "15 = 302 milliseconds"}));
         panelTmc2130.add(cmbTmcIhrIholddelay, "6, 10, fill, default");
@@ -516,12 +534,22 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblTmcChopConf = new JLabel("CHOPCONF.toff");
         panelTmc2130.add(lblTmcChopConf, "4, 16");
         
-        JComboBox cmbTmcChopchonfToff = new JComboBox();
+        cmbTmcChopchonfToff = new JComboBox();
         cmbTmcChopchonfToff.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfToff.setModel(new DefaultComboBoxModel(new String[] {"0 = Driver disable, all bridges off", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}));
         panelTmc2130.add(cmbTmcChopchonfToff, "6, 16, fill, default");
         
         JButton btnTmcChopconfWrite = new JButton("Write CHOPCONF");
+        btnTmcChopconfWrite.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().setChopConf();
+				} catch (Exception e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcChopconfWrite, "8, 16, 1, 16");
         
         JLabel lblNewLabel_8 = new JLabel("TOFF off time and driver enable");
@@ -531,7 +559,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblChopconf = new JLabel("CHOPCONF.hstrt");
         panelTmc2130.add(lblChopconf, "4, 17");
         
-        JComboBox cmbTmcChopchonfHstrt = new JComboBox();
+        cmbTmcChopchonfHstrt = new JComboBox();
         cmbTmcChopchonfHstrt.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfHstrt.setModel(new DefaultComboBoxModel(new String[] {"1", "2", "3", "4", "5", "6", "7", "8"}));
         panelTmc2130.add(cmbTmcChopchonfHstrt, "6, 17, fill, default");
@@ -543,7 +571,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblNewLabel_14 = new JLabel("CHOPCONF.hend");
         panelTmc2130.add(lblNewLabel_14, "4, 18");
         
-        JComboBox cmbTmcChopchonfHend = new JComboBox();
+        cmbTmcChopchonfHend = new JComboBox();
         cmbTmcChopchonfHend.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfHend.setModel(new DefaultComboBoxModel(new String[] {"-3", "-2", "-1", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"}));
         panelTmc2130.add(cmbTmcChopchonfHend, "6, 18, fill, default");
@@ -555,7 +583,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblNewLabel_15 = new JLabel("CHOPCONF.fd3");
         panelTmc2130.add(lblNewLabel_15, "4, 19");
         
-        JComboBox cmbTmcChopchonfFd3 = new JComboBox();
+        cmbTmcChopchonfFd3 = new JComboBox();
         cmbTmcChopchonfFd3.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfFd3.setModel(new DefaultComboBoxModel(new String[] {"0 = ?", "1 = MSB of fast decay time setting TFD (when chm=1)"}));
         panelTmc2130.add(cmbTmcChopchonfFd3, "6, 19, fill, default");
@@ -568,7 +596,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblNewLabel_16 = new JLabel("CHOPCONF.disfdcc");
         panelTmc2130.add(lblNewLabel_16, "4, 20");
         
-        JComboBox cmbTmcChopchonfDisfdcc = new JComboBox();
+        cmbTmcChopchonfDisfdcc = new JComboBox();
         cmbTmcChopchonfDisfdcc.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfDisfdcc.setModel(new DefaultComboBoxModel(new String[] {"0 = ", "1 = Disables current comparator usage for termination of the fast decay cycle"}));
         panelTmc2130.add(cmbTmcChopchonfDisfdcc, "6, 20, fill, default");
@@ -580,7 +608,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblChopconf_1 = new JLabel("CHOPCONF.rndtf");
         panelTmc2130.add(lblChopconf_1, "4, 21");
         
-        JComboBox cmbTmcChopchonfRndtf = new JComboBox();
+        cmbTmcChopchonfRndtf = new JComboBox();
         cmbTmcChopchonfRndtf.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfRndtf.setModel(new DefaultComboBoxModel(new String[] {"0 = Chopper off time is fixed as set by TOFF", "1 = Random mode, TOFF is random modulated by dNclk = -12 ... +3 clocks."}));
         panelTmc2130.add(cmbTmcChopchonfRndtf, "6, 21, fill, default");
@@ -592,7 +620,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblChopconf_2 = new JLabel("CHOPCONF.chm");
         panelTmc2130.add(lblChopconf_2, "4, 22");
         
-        JComboBox cmbTmcChopchonfChm = new JComboBox();
+        cmbTmcChopchonfChm = new JComboBox();
         cmbTmcChopchonfChm.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfChm.setModel(new DefaultComboBoxModel(new String[] {"0 = spreadCycle (standard mode)", "1 = Constant off time with fast decay time."}));
         panelTmc2130.add(cmbTmcChopchonfChm, "6, 22, fill, default");
@@ -604,7 +632,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblChopconf_3 = new JLabel("CHOPCONF.tbl");
         panelTmc2130.add(lblChopconf_3, "4, 23");
         
-        JComboBox cmbTmcChopchonfTbl = new JComboBox();
+        cmbTmcChopchonfTbl = new JComboBox();
         cmbTmcChopchonfTbl.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfTbl.setToolTipText("Hint: 24 or 36 is recommended for most applications");
         cmbTmcChopchonfTbl.setModel(new DefaultComboBoxModel(Tbl.values()));
@@ -617,7 +645,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblChopconf_4 = new JLabel("CHOPCONF.vsense");
         panelTmc2130.add(lblChopconf_4, "4, 24");
         
-        JComboBox cmbTmcChopchonfVsense = new JComboBox();
+        cmbTmcChopchonfVsense = new JComboBox();
         cmbTmcChopchonfVsense.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfVsense.setModel(new DefaultComboBoxModel(new String[] {"0 = Low sensitivity, high sense resistor voltage", "1 = High sensitivity, low sense resistor voltage"}));
         panelTmc2130.add(cmbTmcChopchonfVsense, "6, 24, fill, default");
@@ -629,7 +657,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblChopconf_5 = new JLabel("CHOPCONF.vhighfs");
         panelTmc2130.add(lblChopconf_5, "4, 25");
         
-        JComboBox cmbTmcChopchonfVhighfs = new JComboBox();
+        cmbTmcChopchonfVhighfs = new JComboBox();
         cmbTmcChopchonfVhighfs.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfVhighfs.setModel(new DefaultComboBoxModel(new String[] {"0", "1"}));
         panelTmc2130.add(cmbTmcChopchonfVhighfs, "6, 25, fill, default");
@@ -641,7 +669,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblChopconf_6 = new JLabel("CHOPCONF.vhighchm");
         panelTmc2130.add(lblChopconf_6, "4, 26");
         
-        JComboBox cmbTmcChopchonfVhighchm = new JComboBox();
+        cmbTmcChopchonfVhighchm = new JComboBox();
         cmbTmcChopchonfVhighchm.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfVhighchm.setModel(new DefaultComboBoxModel(new String[] {"0 = ", "1 = Switch to chm=1 and fd=0 when VHIGH is exceeded"}));
         cmbTmcChopchonfVhighchm.setToolTipText("This bit enables switching to chm=1 and fd=0, when VHIGH is exceeded. This way, a higher velocity can be achieved. Can be combined with vhighfs=1. If set, the TOFF setting automatically becomes doubled during high velocity operation in order to avoid doubling of the chopper frequency.");
@@ -654,7 +682,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblChopconf_7 = new JLabel("CHOPCONF.sync");
         panelTmc2130.add(lblChopconf_7, "4, 27");
         
-        JComboBox cmbTmcChopchonfSync = new JComboBox();
+        cmbTmcChopchonfSync = new JComboBox();
         cmbTmcChopchonfSync.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfSync.setToolTipText("This register allows synchronization of the chopper for both phases of a two phase motor in  order to avoid the occurrence of a beat, especially at low motor velocities. It is automatically switched off above VHIGH.  \n\nSynchronization with f SYNC = f CLK /(sync*64) \n\nHint: Set TOFF to a low value, so that the chopper cycle is ended, before the next sync clock pulse occurs. Set for the double desired chopper frequency for chm=0, for the desired base chopper frequency for chm=1.");
         cmbTmcChopchonfSync.setModel(new DefaultComboBoxModel(new String[] {"0 = Chopper sync function chopSync off", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}));
@@ -667,7 +695,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblChopconf_8 = new JLabel("CHOPCONF.mres");
         panelTmc2130.add(lblChopconf_8, "4, 28");
         
-        JComboBox cmbTmcChopchonfMres = new JComboBox();
+        cmbTmcChopchonfMres = new JComboBox();
         cmbTmcChopchonfMres.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfMres.setModel(new DefaultComboBoxModel(Mres.values()));
         panelTmc2130.add(cmbTmcChopchonfMres, "6, 28, fill, default");
@@ -679,7 +707,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblNewLabel_17 = new JLabel("CHOPCONF.intpol");
         panelTmc2130.add(lblNewLabel_17, "4, 29");
         
-        JComboBox cmbTmcChopchonfIntpol = new JComboBox();
+        cmbTmcChopchonfIntpol = new JComboBox();
         cmbTmcChopchonfIntpol.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfIntpol.setModel(new DefaultComboBoxModel(new String[] {"0 = No Interpolation", "1 = Interpolate to 256x"}));
         panelTmc2130.add(cmbTmcChopchonfIntpol, "6, 29, fill, default");
@@ -691,7 +719,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblChopconf_9 = new JLabel("CHOPCONF.dedge");
         panelTmc2130.add(lblChopconf_9, "4, 30");
         
-        JComboBox cmbTmcChopchonfDedge = new JComboBox();
+        cmbTmcChopchonfDedge = new JComboBox();
         cmbTmcChopchonfDedge.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcChopchonfDedge.setModel(new DefaultComboBoxModel(new String[] {"0 = ", "1 = Enable step impulse at each step edge to reduce step frequency requirement."}));
         panelTmc2130.add(cmbTmcChopchonfDedge, "6, 30, fill, default");
@@ -703,10 +731,10 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel cmbTmcChopchonfDiss2g = new JLabel("CHOPCONF.diss2g");
         panelTmc2130.add(cmbTmcChopchonfDiss2g, "4, 31");
         
-        JComboBox comboBox_18 = new JComboBox();
-        comboBox_18.setFont(new Font("Dialog", Font.PLAIN, 10));
-        comboBox_18.setModel(new DefaultComboBoxModel(new String[] {"0 = Short to GND protection is on", "1 = Short to GND protection is disabled"}));
-        panelTmc2130.add(comboBox_18, "6, 31, fill, default");
+        cmbTmcChopconfDiss2g = new JComboBox();
+        cmbTmcChopconfDiss2g.setFont(new Font("Dialog", Font.PLAIN, 10));
+        cmbTmcChopconfDiss2g.setModel(new DefaultComboBoxModel(new String[] {"0 = Short to GND protection is on", "1 = Short to GND protection is disabled"}));
+        panelTmc2130.add(cmbTmcChopconfDiss2g, "6, 31, fill, default");
         
         JLabel lblShorttogroundProtection = new JLabel("Short-to-ground protection disabled");
         lblShorttogroundProtection.setFont(new Font("Dialog", Font.PLAIN, 12));
@@ -718,12 +746,22 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblCoolconf = new JLabel("COOLCONF.sfilt");
         panelTmc2130.add(lblCoolconf, "4, 32");
         
-        JComboBox cmbTmcCoolconfSfilt = new JComboBox();
+        cmbTmcCoolconfSfilt = new JComboBox();
         cmbTmcCoolconfSfilt.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcCoolconfSfilt.setModel(new DefaultComboBoxModel(new String[] {"0 = Standard mode, high time resolution for stallGuard2", "1 = Filtered mode, stallGuard2 signal updated for each four fullsteps (resp. six fullsteps for 3 phase motor) only to compensate for motor pole tolerances"}));
         panelTmc2130.add(cmbTmcCoolconfSfilt, "6, 32, fill, default");
         
         JButton btnTmcCoolconfWrite = new JButton("Write COOLCONF");
+        btnTmcCoolconfWrite.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().setCoolConf();
+				} catch (Exception e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcCoolconfWrite, "8, 32, 1, 7");
         
         JLabel lblS = new JLabel("stallGuard2 filter enable");
@@ -745,7 +783,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblCoolconfseimin = new JLabel("COOLCONF.seimin");
         panelTmc2130.add(lblCoolconfseimin, "4, 34");
         
-        JComboBox cmbTmcCoolconfSeimin = new JComboBox();
+        cmbTmcCoolconfSeimin = new JComboBox();
         cmbTmcCoolconfSeimin.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcCoolconfSeimin.setModel(new DefaultComboBoxModel(new String[] {"0 = 1/2 of current setting (IRUN)", "1 = 1/4 of current setting (IRUN)"}));
         panelTmc2130.add(cmbTmcCoolconfSeimin, "6, 34, fill, default");
@@ -757,7 +795,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblNewLabel_50 = new JLabel("COOLCONF.sedn");
         panelTmc2130.add(lblNewLabel_50, "4, 35");
         
-        JComboBox cmbTmcCoolconfSedn = new JComboBox();
+        cmbTmcCoolconfSedn = new JComboBox();
         cmbTmcCoolconfSedn.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcCoolconfSedn.setModel(new DefaultComboBoxModel(new String[] {"0 = For each 32 stallGuard2 values decrease by one", "1 = For each 8 stallGuard2 values decrease by one", "2 = For each 2 stallGuard2 values decrease by one", "3 = For each stallGuard2 value decrease by one"}));
         panelTmc2130.add(cmbTmcCoolconfSedn, "6, 35, fill, default");
@@ -769,7 +807,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblCoolconfsemax = new JLabel("COOLCONF.semax");
         panelTmc2130.add(lblCoolconfsemax, "4, 36");
         
-        JComboBox cmbTmcCoolconfSemax = new JComboBox();
+        cmbTmcCoolconfSemax = new JComboBox();
         cmbTmcCoolconfSemax.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcCoolconfSemax.setModel(new DefaultComboBoxModel(new String[] {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}));
         panelTmc2130.add(cmbTmcCoolconfSemax, "6, 36, fill, default");
@@ -781,7 +819,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblCoolconfseup = new JLabel("COOLCONF.seup");
         panelTmc2130.add(lblCoolconfseup, "4, 37");
         
-        JComboBox cmbTmcCoolconfSeup = new JComboBox();
+        cmbTmcCoolconfSeup = new JComboBox();
         cmbTmcCoolconfSeup.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcCoolconfSeup.setModel(new DefaultComboBoxModel(new String[] {"0 = 1", "1 = 2", "2 = 4", "3 = 8"}));
         panelTmc2130.add(cmbTmcCoolconfSeup, "6, 37, fill, default");
@@ -793,7 +831,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblCoolconfsemin = new JLabel("COOLCONF.semin");
         panelTmc2130.add(lblCoolconfsemin, "4, 38");
         
-        JComboBox cmbTmcCoolconfSemin = new JComboBox();
+        cmbTmcCoolconfSemin = new JComboBox();
         cmbTmcCoolconfSemin.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcCoolconfSemin.setModel(new DefaultComboBoxModel(new String[] {"0 = Smart current control coolStep off", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}));
         panelTmc2130.add(cmbTmcCoolconfSemin, "6, 38, fill, default");
@@ -808,7 +846,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblTmcDrvStatus = new JLabel("DRV_STATUS.stst");
         panelTmc2130.add(lblTmcDrvStatus, "4, 39");
         
-        JCheckBox chkTmcDrvstatusStst = new JCheckBox("Standstill");
+        chkTmcDrvstatusStst = new JCheckBox("Standstill");
         chkTmcDrvstatusStst.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcDrvstatusStst, "6, 39");
         
@@ -822,7 +860,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblDrvstatus = new JLabel("DRV_STATUS.ola");
         panelTmc2130.add(lblDrvstatus, "4, 40");
         
-        JCheckBox chkTmcDrvstatusOla = new JCheckBox("Open Load");
+        chkTmcDrvstatusOla = new JCheckBox("Open Load");
         chkTmcDrvstatusOla.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcDrvstatusOla, "6, 40");
         
@@ -833,7 +871,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblDrvstatus_2 = new JLabel("DRV_STATUS.olb");
         panelTmc2130.add(lblDrvstatus_2, "4, 41");
         
-        JCheckBox chkTmcDrvstatusOlb = new JCheckBox("Open Load");
+        chkTmcDrvstatusOlb = new JCheckBox("Open Load");
         chkTmcDrvstatusOlb.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcDrvstatusOlb, "6, 41");
         
@@ -844,7 +882,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblDrvstatus_3 = new JLabel("DRV_STATUS.s2gb");
         panelTmc2130.add(lblDrvstatus_3, "4, 42");
         
-        JCheckBox chkTmcDrvstatusS2gb = new JCheckBox("Short 2 GND");
+        chkTmcDrvstatusS2gb = new JCheckBox("Short 2 GND");
         chkTmcDrvstatusS2gb.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcDrvstatusS2gb, "6, 42");
         
@@ -855,7 +893,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblDrvstatus_7 = new JLabel("DRV_STATUS.s2ga");
         panelTmc2130.add(lblDrvstatus_7, "4, 43");
         
-        JCheckBox chkTmcDrvstatusS2ga = new JCheckBox("Short 2 GND");
+        chkTmcDrvstatusS2ga = new JCheckBox("Short 2 GND");
         chkTmcDrvstatusS2ga.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcDrvstatusS2ga, "6, 43");
         
@@ -866,7 +904,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblDrvstatus_4 = new JLabel("DRV_STATUS.otpw");
         panelTmc2130.add(lblDrvstatus_4, "4, 44");
         
-        JCheckBox chkTmcDrvstatusOtpw = new JCheckBox("OT pre-warn");
+        chkTmcDrvstatusOtpw = new JCheckBox("OT pre-warn");
         chkTmcDrvstatusOtpw.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcDrvstatusOtpw, "6, 44");
         
@@ -877,7 +915,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblDrvstatus_5 = new JLabel("DRV_STATUS.ot");
         panelTmc2130.add(lblDrvstatus_5, "4, 45");
         
-        JCheckBox chkTmcDrvstatusOt = new JCheckBox("Overtemp");
+        chkTmcDrvstatusOt = new JCheckBox("Overtemp");
         chkTmcDrvstatusOt.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcDrvstatusOt, "6, 45");
         
@@ -888,7 +926,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblDrvstatus_6 = new JLabel("DRV_STATUS.stallGuard");
         panelTmc2130.add(lblDrvstatus_6, "4, 46");
         
-        JCheckBox chkTmcDrvstatusStallguard = new JCheckBox("Stall Detected");
+        chkTmcDrvstatusStallguard = new JCheckBox("Stall Detected");
         chkTmcDrvstatusStallguard.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcDrvstatusStallguard, "6, 46");
         
@@ -911,7 +949,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblDrvstatus_9 = new JLabel("DRV_STATUS.fsactive");
         panelTmc2130.add(lblDrvstatus_9, "4, 48");
         
-        JCheckBox chkTmcDrvstatusFsactive = new JCheckBox("Active");
+        chkTmcDrvstatusFsactive = new JCheckBox("Active");
         chkTmcDrvstatusFsactive.setFont(new Font("Dialog", Font.PLAIN, 10));
         panelTmc2130.add(chkTmcDrvstatusFsactive, "6, 48");
         
@@ -962,7 +1000,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblPwmconfpwmfreq = new JLabel("PWMCONF.pwm_freq");
         panelTmc2130.add(lblPwmconfpwmfreq, "4, 52");
         
-        JComboBox cmbTmcPwmconfFreq = new JComboBox();
+        cmbTmcPwmconfFreq = new JComboBox();
         cmbTmcPwmconfFreq.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcPwmconfFreq.setModel(new DefaultComboBoxModel(Pwmfreq.values()));
         panelTmc2130.add(cmbTmcPwmconfFreq, "6, 52, fill, default");
@@ -974,7 +1012,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblPwmconfpwmautoscale = new JLabel("PWMCONF.pwm_autoscale");
         panelTmc2130.add(lblPwmconfpwmautoscale, "4, 53");
         
-        JCheckBox chkTmcPwmconfAutoscale = new JCheckBox("Autoscale?");
+        chkTmcPwmconfAutoscale = new JCheckBox("Autoscale?");
         chkTmcPwmconfAutoscale.setFont(new Font("Dialog", Font.PLAIN, 12));
         panelTmc2130.add(chkTmcPwmconfAutoscale, "6, 53");
         
@@ -985,7 +1023,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblPwmconfpwmsymmetric = new JLabel("PWMCONF.pwm_symmetric");
         panelTmc2130.add(lblPwmconfpwmsymmetric, "4, 54, right, default");
         
-        JComboBox cmbTmcPwmconfSymmetric = new JComboBox();
+        cmbTmcPwmconfSymmetric = new JComboBox();
         cmbTmcPwmconfSymmetric.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcPwmconfSymmetric.setModel(new DefaultComboBoxModel(new String[] {"Standard", "Symmetric"}));
         panelTmc2130.add(cmbTmcPwmconfSymmetric, "6, 54, fill, default");
@@ -997,7 +1035,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         JLabel lblPwmconffreewheel = new JLabel("PWMCONF.freewheel");
         panelTmc2130.add(lblPwmconffreewheel, "4, 55");
         
-        JComboBox cmbTmcPwmconfFreewheel = new JComboBox();
+        cmbTmcPwmconfFreewheel = new JComboBox();
         cmbTmcPwmconfFreewheel.setFont(new Font("Dialog", Font.PLAIN, 10));
         cmbTmcPwmconfFreewheel.setModel(new DefaultComboBoxModel(Freewheel.values()));
         panelTmc2130.add(cmbTmcPwmconfFreewheel, "6, 55, fill, default");
@@ -1294,7 +1332,72 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         
         addWrappedBinding(driver.getCameraPoseCalibration(), "enabled", chckbxEnableCameraPose, "selected");
         
-
+//        // gconf
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().gConf.en_pwm_mode, "value", chkTmcGconfEnpwmmode, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().gConf.small_hysteresis, "value", cmbTmcGconfSh, "selectedItem", new BooleanListConverter(cmbTmcGconfSh.getModel()));
+//        // gstat
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().gStat.drv_err, "value", chkTmcGstatDrvErr, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().gStat.reset, "value", chkTmcGstatReset, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().gStat.uv_cp, "value", chkTmcGstatUvcp, "selected");
+//        // ioin
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().ioin, "value", txtTmcIoinVersion, "text");
+//        // ihr        
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().ihr.ihold, "value", cmbTmcIhrIhold, "selectedItem", new ShortPrefixConverter(cmbTmcIhrIhold.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().ihr.iholddelay, "value", cmbTmcIhrIholddelay, "selectedItem", new ShortPrefixConverter(cmbTmcIhrIholddelay.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().ihr.irun, "value", cmbTmcIhrIrun, "selectedItem", new ShortPrefixConverter(cmbTmcIhrIrun.getModel()));
+//        // various
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().tPowerDown, "value", txtTmcTpowerdown, "text");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().tStep, "value", txtTmcTstep, "text");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().tPwmThrs, "value", txtTmcPwmThrs, "text");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().tCoolThrs, "value", txtTmcTcoolthrs, "text");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().tHigh, "value", txtTmcThigh, "text");
+        // chopconf
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.chm, "value", cmbTmcChopchonfChm, "selectedItem", new BooleanListConverter(cmbTmcChopchonfChm.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.dedge, "value", cmbTmcChopchonfDedge, "selectedItem", new BooleanListConverter(cmbTmcChopchonfDedge.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.disfdcc, "value", cmbTmcChopchonfDisfdcc, "selectedItem", new BooleanListConverter(cmbTmcChopchonfDisfdcc.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.diss2g, "value", cmbTmcChopconfDiss2g, "selectedItem", new BooleanListConverter(cmbTmcChopconfDiss2g.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.fd3, "value", cmbTmcChopchonfFd3, "selectedItem", new BooleanListConverter(cmbTmcChopchonfFd3.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.hend, "value", cmbTmcChopchonfHend, "selectedItem", new ShortPrefixConverter(cmbTmcChopchonfHend.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.hstrt, "value", cmbTmcChopchonfHstrt, "selectedItem", new ShortPrefixConverter(cmbTmcChopchonfHstrt.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.intpol, "value", cmbTmcChopchonfIntpol, "selectedItem", new BooleanListConverter(cmbTmcChopchonfIntpol.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.mres, "value", cmbTmcChopchonfMres, "selectedItem");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.rndtf, "value", cmbTmcChopchonfRndtf, "selectedItem", new BooleanListConverter(cmbTmcChopchonfRndtf.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.sync, "value", cmbTmcChopchonfSync, "selectedItem", new ShortPrefixConverter(cmbTmcChopchonfSync.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.tbl, "value", cmbTmcChopchonfTbl, "selectedItem");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.toff, "value", cmbTmcChopchonfToff, "selectedItem", new ShortPrefixConverter(cmbTmcChopchonfToff.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.vhighchm, "value", cmbTmcChopchonfVhighchm, "selectedItem", new BooleanListConverter(cmbTmcChopchonfVhighchm.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.vhighfs, "value", cmbTmcChopchonfVhighfs, "selectedItem", new BooleanListConverter(cmbTmcChopchonfVhighfs.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().chopConf.vsense, "value", cmbTmcChopchonfVsense, "selectedItem", new BooleanListConverter(cmbTmcChopchonfVsense.getModel()));
+        // coolconf
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().coolConfig.sfilt, "value", cmbTmcCoolconfSfilt, "selectedItem", new BooleanListConverter(cmbTmcCoolconfSfilt.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().coolConfig.sgt, "value", txtTmcCoolconfSgt, "text");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().coolConfig.seimin, "value", cmbTmcCoolconfSeimin, "selectedItem", new BooleanListConverter(cmbTmcCoolconfSeimin.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().coolConfig.sedn, "value", cmbTmcCoolconfSedn, "selectedItem", new ShortPrefixConverter(cmbTmcCoolconfSedn.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().coolConfig.semax, "value", cmbTmcCoolconfSemax, "selectedItem", new ShortPrefixConverter(cmbTmcCoolconfSemax.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().coolConfig.seup, "value", cmbTmcCoolconfSeup, "selectedItem", new ShortPrefixConverter(cmbTmcCoolconfSeup.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().coolConfig.semin, "value", cmbTmcCoolconfSemin, "selectedItem", new ShortPrefixConverter(cmbTmcCoolconfSemin.getModel()));
+        // drvstatus
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.stst, "value", chkTmcDrvstatusStst, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.olb, "value", chkTmcDrvstatusOlb, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.ola, "value", chkTmcDrvstatusOla, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.s2gb, "value", chkTmcDrvstatusS2gb, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.s2ga, "value", chkTmcDrvstatusS2ga, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.otpw, "value", chkTmcDrvstatusOtpw, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.ot, "value", chkTmcDrvstatusOt, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.stallGuard, "value", chkTmcDrvstatusStallguard, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.cs_actual, "value", txtTmcDrvstatusCsactual, "text");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.fsactive, "value", chkTmcDrvstatusFsactive, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().drvStatus.sg_result, "value", txtTmcDrvstatusSgresult, "text");
+        // pwmconf
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().pwmConf.pwm_ampl, "value", txtTmcPwmconfAmpl, "text");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().pwmConf.pwm_grad, "value", txtTmcPwmconfGrad, "text");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().pwmConf.pwm_freq, "value", cmbTmcPwmconfFreq, "selectedItem");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().pwmConf.pwm_autoscale, "value", chkTmcPwmconfAutoscale, "selected");
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().pwmConf.pwm_symmetric, "value", cmbTmcPwmconfSymmetric, "selectedItem", new BooleanListConverter(cmbTmcPwmconfSymmetric.getModel()));
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().pwmConf.freewheel, "value", cmbTmcPwmconfFreewheel, "selectedItem");
+        // pwmscale
+        bind(UpdateStrategy.READ_WRITE, driver.getTmc2130().pwmScale, "value", txtTmcPwmscale, "text");
+        
         ComponentDecorators.decorateWithAutoSelect(textFieldE);
         ComponentDecorators.decorateWithAutoSelect(textFieldF);
         ComponentDecorators.decorateWithAutoSelect(textFieldRe);
@@ -1314,6 +1417,51 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseBottomX);
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseBottomY);
         ComponentDecorators.decorateWithAutoSelectAndLengthConversion(textFieldCamPoseBottomZ);
+    }
+    
+    public class ShortPrefixConverter extends Converter<Short, String> {
+    	ComboBoxModel<String> model;
+    	
+    	public ShortPrefixConverter(ComboBoxModel<String> model) {
+    		this.model = model;
+    	}
+    	
+		@Override
+		public String convertForward(Short arg0) {
+			for (int i = 0; i < model.getSize(); i++) {
+				if (arg0 == getShortPrefix(model.getElementAt(i))) {
+					return model.getElementAt(i);
+				}
+			}
+			return null;
+		}
+
+		@Override
+		public Short convertReverse(String arg0) {
+			return getShortPrefix(arg0);
+		}
+		
+		private short getShortPrefix(String s) {
+			return Short.parseShort(s.split(" ")[0]);
+		}
+    }
+
+    public class BooleanListConverter extends Converter<Boolean, String> {
+    	ComboBoxModel<String> model;
+    	
+    	public BooleanListConverter(ComboBoxModel<String> model) {
+    		this.model = model;
+    	}
+    	
+		@Override
+		public String convertForward(Boolean arg0) {
+			return model.getElementAt(arg0 ? 1 : 0);
+		}
+
+		@Override
+		public Boolean convertReverse(String arg0) {
+			return !model.getElementAt(0).equals(arg0); 
+		}
     }
 
     @SuppressWarnings("serial")
@@ -1619,4 +1767,47 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
     private JTextField txtTmcDrvstatusCsactual;
     private JTextField txtTmcIoinVersion;
     private JTextField txtTmcCoolconfSgt;
+    private JCheckBox chkTmcGconfEnpwmmode;
+    private JComboBox cmbTmcGconfSh;
+    private JCheckBox chkTmcGstatReset;
+    private JCheckBox chkTmcGstatDrvErr;
+    private JCheckBox chkTmcGstatUvcp;
+    private JComboBox cmbTmcIhrIhold;
+    private JComboBox cmbTmcIhrIrun;
+    private JComboBox cmbTmcIhrIholddelay;
+    private JComboBox cmbTmcChopchonfToff;
+    private JComboBox cmbTmcChopchonfHstrt;
+    private JComboBox cmbTmcChopchonfHend;
+    private JComboBox cmbTmcChopchonfFd3;
+    private JComboBox cmbTmcChopchonfDisfdcc;
+    private JComboBox cmbTmcChopchonfRndtf;
+    private JComboBox cmbTmcChopchonfChm;
+    private JComboBox cmbTmcChopchonfTbl;
+    private JComboBox cmbTmcChopchonfVsense;
+    private JComboBox cmbTmcChopchonfVhighfs;
+    private JComboBox cmbTmcChopchonfVhighchm;
+    private JComboBox cmbTmcChopchonfSync;
+    private JComboBox cmbTmcChopchonfMres;
+    private JComboBox cmbTmcChopchonfIntpol;
+    private JComboBox cmbTmcChopchonfDedge;
+    private JComboBox cmbTmcChopconfDiss2g;
+    private JComboBox cmbTmcCoolconfSfilt;
+    private JComboBox cmbTmcCoolconfSeimin;
+    private JComboBox cmbTmcCoolconfSedn;
+    private JComboBox cmbTmcCoolconfSemax;
+    private JComboBox cmbTmcCoolconfSeup;
+    private JComboBox cmbTmcCoolconfSemin;
+    private JCheckBox chkTmcDrvstatusStst;
+    private JCheckBox chkTmcDrvstatusOla;
+    private JCheckBox chkTmcDrvstatusOlb;
+    private JCheckBox chkTmcDrvstatusS2gb;
+    private JCheckBox chkTmcDrvstatusS2ga;
+    private JCheckBox chkTmcDrvstatusOtpw;
+    private JCheckBox chkTmcDrvstatusOt;
+    private JCheckBox chkTmcDrvstatusStallguard;
+    private JCheckBox chkTmcDrvstatusFsactive;
+    private JComboBox cmbTmcPwmconfFreq;
+    private JCheckBox chkTmcPwmconfAutoscale;
+    private JComboBox cmbTmcPwmconfSymmetric;
+    private JComboBox cmbTmcPwmconfFreewheel;
 }
