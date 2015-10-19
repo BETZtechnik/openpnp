@@ -127,6 +127,9 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
     @Attribute(required=false)
 	private double nozzleStepsPerDegree =  8.888888888;
     
+    @Element(required=false)
+    private Tmc2130 tmc2130 = new Tmc2130();
+    
     
     private boolean nozzleEnabled = false;
     private boolean powerSupplyOn = false;
@@ -140,7 +143,6 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
     private String connectedVersion;
     private LinkedBlockingQueue<JsonObject> responseQueue = new LinkedBlockingQueue<>();
     private JsonParser parser = new JsonParser();
-    private Tmc2130 tmc2130 = new Tmc2130(this);
 	/*
 	 * Stores whether or not the machine has been homed. If it has been homed
 	 * and we are disabling the machine, before homing again we move to zero
@@ -162,6 +164,8 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                     throws Exception {
                 ReferenceMachine machine = (ReferenceMachine) configuration.getMachine();
                 machine.registerFeederClass(CarouselFeeder.class);
+                
+                tmc2130.setDriver(FireStepDriver.this);
                 
                 if (carouselDrivers.isEmpty()) {
                 	carouselDrivers.add(new CarouselDriver());
@@ -523,7 +527,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 		}
 		
         if (!synced)  {
-            throw new Error(
+            throw new Exception(
                 String.format("Unable to receive connection response from FireStep. Check your port and baud rate, and that you are running at least version %f of FireStep", 
                         minimumRequiredVersion));
         }
@@ -539,7 +543,7 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
         }
 		
         if (!connected)  {
-            throw new Error(
+            throw new Exception(
                 String.format("Unable to receive connection response from FireStep. Check your port and baud rate, and that you are running at least version %f of FireStep", 
                         minimumRequiredVersion));
         }
@@ -1284,13 +1288,16 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 			if (line.endsWith("} ")) {
 			    // If this is the end of a response we can package up
 			    // everything that has come before it and parse it.
-			    // TODO: handle parse failure error and indicate to the
-			    // controller that this has failed somehow
-			    JsonObject o = parser
-			            .parse(lineBuffer.toString())
-			            .getAsJsonObject();
-	            responseQueue.offer(o);
-                lineBuffer = new StringBuffer();
+				try {
+				    JsonObject o = parser
+				            .parse(lineBuffer.toString())
+				            .getAsJsonObject();
+		            responseQueue.offer(o);
+	                lineBuffer = new StringBuffer();
+				}
+				catch (Exception e) {
+					logger.error("JSON parse error", e);
+				}
 			}
 		}
 	}

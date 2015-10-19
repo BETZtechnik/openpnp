@@ -1,8 +1,7 @@
 package org.firepick.driver;
 
-import java.util.List;
-
 import org.openpnp.gui.support.BoundProperty;
+import org.simpleframework.xml.Attribute;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +75,10 @@ public class Tmc2130 {
 	
 	private static final Logger logger = LoggerFactory.getLogger(Tmc2130.class);
 	FireStepDriver driver;
+	
+	@Attribute(required=false)
+	public boolean enabled = false;
+	
 	public Gconf gConf = new Gconf();
 	public Gstat gStat = new Gstat();
 	public BoundProperty<Integer> ioin = new BoundProperty<>(0);
@@ -91,7 +94,7 @@ public class Tmc2130 {
 	public Pwmconf pwmConf = new Pwmconf();
 	public BoundProperty<Integer> pwmScale = new BoundProperty<>(0);
 	
-	public Tmc2130(FireStepDriver driver) {
+	public void setDriver(FireStepDriver driver) {
 		this.driver = driver;
 	}
 	

@@ -25,6 +25,7 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
@@ -48,7 +49,6 @@ import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
 
 import org.firepick.driver.FireStepDriver;
-import org.firepick.driver.Tmc2130;
 import org.firepick.driver.Tmc2130.Freewheel;
 import org.firepick.driver.Tmc2130.Mres;
 import org.firepick.driver.Tmc2130.Pwmfreq;
@@ -75,7 +75,6 @@ import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.FormSpecs;
 import com.jgoodies.forms.layout.RowSpec;
-import java.awt.event.ActionListener;
 
 public class FireStepDriverWizard  extends AbstractSerialPortDriverConfigurationWizard {
     private final FireStepDriver driver;
@@ -214,7 +213,9 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         
         JPanel panelTmc2130 = new JPanel();
         panelTmc2130.setBorder(new TitledBorder(null, "TMC2130 Stepper SPI Driver Settings", TitledBorder.LEADING, TitledBorder.TOP, null, null));
-        contentPanel.add(panelTmc2130);
+        if (driver.getTmc2130().enabled) {
+            contentPanel.add(panelTmc2130);
+        }
         panelTmc2130.setLayout(new FormLayout(new ColumnSpec[] {
         		FormSpecs.LABEL_COMPONENT_GAP_COLSPEC,
         		FormSpecs.MIN_COLSPEC,
@@ -580,8 +581,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         		try {
 					driver.getTmc2130().writeThigh();
 				} catch (Exception e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 				}
         	}
         });
@@ -917,8 +917,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         		try {
 					driver.getTmc2130().readDrvStatus();
 				} catch (Exception e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 				}
         	}
         });
@@ -1056,8 +1055,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         		try {
 					driver.getTmc2130().writePwmConf();
 				} catch (Exception e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 				}
         	}
         });
@@ -1141,8 +1139,7 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         		try {
 					driver.getTmc2130().readPwmScale();
 				} catch (Exception e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 				}
         	}
         });
