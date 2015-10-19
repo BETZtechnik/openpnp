@@ -2,6 +2,10 @@ package org.openpnp.gui.support;
 
 import org.openpnp.model.AbstractModelObject;
 
+/**
+ * A simple value wrapper that provides PropertyChangeListener support. Can
+ * be used in place of basic fields.
+ */
 public class BoundProperty<T> extends AbstractModelObject {
 	T value;
 	
