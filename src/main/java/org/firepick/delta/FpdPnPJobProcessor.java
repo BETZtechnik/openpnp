@@ -21,14 +21,29 @@
 
 package org.firepick.delta;
 
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.RotatedRect;
+import org.openpnp.gui.MainFrame;
+import org.openpnp.gui.components.CameraView;
 import org.openpnp.gui.support.Wizard;
 import org.openpnp.model.Board;
 import org.openpnp.model.BoardLocation;
 import org.openpnp.model.Configuration;
+import org.openpnp.model.Length;
+import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
 import org.openpnp.model.Part;
 import org.openpnp.model.Placement;
 import org.openpnp.spi.Camera;
+import org.openpnp.spi.Camera.Looking;
 import org.openpnp.spi.Feeder;
 import org.openpnp.spi.Head;
 import org.openpnp.spi.Machine;
@@ -36,8 +51,11 @@ import org.openpnp.spi.Nozzle;
 import org.openpnp.spi.NozzleTip;
 import org.openpnp.spi.VisionProvider;
 import org.openpnp.spi.base.AbstractJobProcessor;
+import org.openpnp.util.MovableUtils;
 import org.openpnp.util.Utils2D;
+import org.openpnp.util.VisionUtils;
 import org.openpnp.vision.FiducialLocator;
+import org.openpnp.vision.FluentCv;
 import org.simpleframework.xml.Attribute;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,6 +106,20 @@ public class FpdPnPJobProcessor extends AbstractJobProcessor {
 		Head head = machine.getHeads().get(0);
 		Nozzle nozzle = head.getNozzles().get(0);
 		NozzleTip nozzleTip = nozzle.getNozzleTip();
+		
+        fireDetailedStatusUpdated(String.format("Prepare bottom vision."));        
+        
+        if (!shouldJobProcessingContinue()) {
+            return;
+        }
+
+        try {
+            prepareBottomVision();
+        }
+        catch (Exception e) {
+            fireJobEncounteredError(JobError.MachineMovementError, e.getMessage());
+            return;
+        }
 		
 		for (BoardLocation boardLocation : job.getBoardLocations()) {
 		    Board board = boardLocation.getBoard();
@@ -199,7 +231,7 @@ public class FpdPnPJobProcessor extends AbstractJobProcessor {
 	    // Perform the operation. Note that similar to feeding and nozzle
 	    // tip changing, it is up to the VisionProvider to move the camera
 	    // and nozzle to where it needs to be.
-	    return vp.getPartBottomOffsets(part, nozzle);
+	    return performBottomVision(part, nozzle);
 	}
 	
 	protected Feeder feed(Nozzle nozzle, Part part) throws Exception {
@@ -424,6 +456,184 @@ public class FpdPnPJobProcessor extends AbstractJobProcessor {
         
         return true;
 	}
+	
+	private Map<Length, BufferedImage> bottomVisionBackgroundImages = new HashMap<>();
+	/**
+	 * Move the Nozzle to the camera and takes a picture which is stored
+	 * as the background image for further bottom vision ops.
+	 */
+	private void prepareBottomVision() throws Exception {
+		bottomVisionBackgroundImages.clear();
+		
+		Nozzle nozzle = Configuration.get().getMachine().getDefaultHead().getDefaultNozzle();
+    	Camera camera = Configuration.get().getMachine().getCameras().get(0);
+    	
+        if (camera.getLooking() != Looking.Up) {
+            throw new Exception("Bottom vision only implemented for Up looking cameras");
+        }
+        
+        // figure out all the unique part heights we need to deal with
+        Set<Length> heights = new HashSet<Length>();
+        for (BoardLocation boardLocation : job.getBoardLocations()) {
+        	Board board = boardLocation.getBoard();
+        	for (Placement placement : board.getPlacements()) {
+        		if (placement.getType() != Placement.Type.Place || placement.getSide() != boardLocation.getSide()) {
+        			continue;
+        		}
+        		Part part = placement.getPart();
+        		heights.add(part.getHeight());
+        	}
+        }
+        
+        logger.info("Capturing {} backgrounds.", heights.size());
+        Location originalLocation = nozzle.getLocation();
+        MovableUtils.moveToLocationAtSafeZ(nozzle, camera.getLocation(), 1.0);
+        for (Length height : heights) {
+        	Location heightLocation = new Location(height.getUnits(), 0, 0, height.getValue(), 0);
+        	Location location = camera.getLocation().add(heightLocation);
+        	nozzle.moveTo(location, 1.0);
+            bottomVisionBackgroundImages.put(height, camera.settleAndCapture());
+        }
+        nozzle.moveToSafeZ(1.0);
+	}
+	
+    private Location performBottomVision(Part part, Nozzle nozzle)
+            throws Exception {
+    	Camera camera = Configuration.get().getMachine().getCameras().get(0);
+    	
+        if (camera.getLooking() != Looking.Up) {
+            throw new Exception("Bottom vision only implemented for Up looking cameras");
+        }
+
+        // Create a location that is the Camera's X, Y, it's Z + part height
+        // and a rotation of 0.
+        Location startLocation = camera.getLocation();
+        Length partHeight = part.getHeight();
+        Location partHeightLocation = new Location(partHeight.getUnits(), 0, 0, partHeight.getValue(), 0);
+        startLocation = startLocation
+        		.add(partHeightLocation)
+        		.derive(null, null, null, 0d);
+
+        MovableUtils.moveToLocationAtSafeZ(nozzle, startLocation, 1.0);
+        
+        BufferedImage backgroundImage = bottomVisionBackgroundImages.get(part.getHeight());
+        
+        for (int i = 0; i < 3; i++) {
+            List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+            List<RotatedRect> rects = new ArrayList<RotatedRect>();
+            BufferedImage filteredImage = new FluentCv()
+            	.setCamera(camera)
+            	
+            	.toMat(backgroundImage)
+            	.toGray()
+            	.blurGaussian(3, "background")
+            	
+            	.settleAndCapture("original")
+            	.toGray()
+            	.blurGaussian(3)
+            	
+            	.absDiff("background")
+            	
+    			.blurGaussian(13)
+    			.findEdgesRobertsCross()
+    			.threshold(30)
+    			.findContours(contours)
+    			.recall("original")
+    			.drawContours(contours, null, 1)
+    			.getContourMaxRects(contours, rects)
+    			.drawRects(rects, null, 2)
+            	.toBufferedImage();
+            
+            CameraView cameraView = MainFrame.mainFrame.cameraPanel.getCameraView(camera);
+            cameraView.showFilteredImage(filteredImage, 3000);
+            
+            RotatedRect rect = rects.get(0);
+            System.out.println(rect);
+            		
+            // Create the offsets object. This is the physical distance from
+            // the center of the camera to the located part.
+            Location offsets = VisionUtils.getPixelCenterOffsets(
+                    camera,
+                    rect.center.x, 
+                    rect.center.y);
+
+            // We assume that the part is never picked more than 45º rotated
+            // so if OpenCV tells us it's rotated more than 45º we correct
+            // it. This seems to happen quite a bit when the angle of rotation
+            // is close to 0.
+            double angle = rect.angle;
+            if (Math.abs(angle) > 45) {
+                if (angle < 0) {
+                    angle += 90;
+                }
+                else {
+                    angle -= 90;
+                }
+            }
+            // Set the angle on the offsets.
+            offsets = offsets.derive(null, null, null, -angle);
+            
+            // Move the nozzle so that the part is oriented correctly over the
+            // camera.
+            Location location = nozzle
+                    .getLocation()
+                    .subtractWithRotation(offsets);
+            nozzle.moveTo(location, 1.0);
+        }
+        
+//        for (int i = 0; i < 3; i++) {
+//            // Settle
+//            Thread.sleep(500);
+//            // Grab an image.
+//            BufferedImage image = camera.capture();
+//            
+//            // perform the vision op
+//            FireSightResult result = FireSight.fireSight(image, "firesight/bottomVision.json");
+//            List<RotatedRect> rects = FireSight.parseRotatedRects(
+//                    result.model.get("minAreaRect").getAsJsonObject().get("rects").getAsJsonArray());
+//            RotatedRect rect = rects.get(0);
+//            
+//            // Create the offsets object. This is the physical distance from
+//            // the center of the camera to the located part.
+//            Location offsets = VisionUtils.getPixelCenterOffsets(
+//                    camera,
+//                    rect.center.x, 
+//                    rect.center.y);
+//
+//            // We assume that the part is never picked more than 45º rotated
+//            // so if OpenCV tells us it's rotated more than 45º we correct
+//            // it. This seems to happen quite a bit when the angle of rotation
+//            // is close to 0.
+//            double angle = rect.angle;
+//            if (Math.abs(angle) > 45) {
+//                if (angle < 0) {
+//                    angle += 90;
+//                }
+//                else {
+//                    angle -= 90;
+//                }
+//            }
+//            // Set the angle on the offsets.
+//            offsets = offsets.derive(null, null, null, -angle);
+//            
+//            // Move the nozzle so that the part is oriented correctly over the
+//            // camera.
+//            Location location = nozzle
+//                    .getLocation()
+//                    .subtractWithRotation(offsets);
+//            nozzle.moveTo(location, 1.0);
+//        }
+//        
+//        Location offsets = camera
+//                .getLocation()
+//                .subtractWithRotation(nozzle.getLocation());
+//        
+//        logger.debug("Final bottom vision offsets {}", offsets);
+        
+        // Return to Safe-Z just to be safe.
+        nozzle.moveToSafeZ(1.0);
+        return new Location(LengthUnit.Millimeters, 0, 0, 0, 0);
+    } 
 	
     @Override
     public Wizard getConfigurationWizard() {
