@@ -299,10 +299,10 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         btnTmcGconfWrite.addActionListener(new ActionListener() {
         	public void actionPerformed(ActionEvent e) {
         		try {
-            		driver.getTmc2130().setGconf();
+            		driver.getTmc2130().writeGconf();
         		}
         		catch (Exception e1) {
-        			e1.printStackTrace();
+                    JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         		}
         	}
         });
@@ -335,6 +335,15 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         panelTmc2130.add(chkTmcGstatReset, "6, 4");
         
         JButton btnTmcGstatRead = new JButton("Read GSTAT");
+        btnTmcGstatRead.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().readGstat();
+				} catch (Exception e1) {
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcGstatRead, "8, 4, 1, 3");
         
         JLabel lblNewLabel_45 = new JLabel("Indicates that the IC has been reset since the last read access to GSTAT.");
@@ -375,6 +384,15 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         txtTmcIoinVersion.setColumns(10);
         
         JButton btnTmcIoinRead = new JButton("Read IOIN");
+        btnTmcIoinRead.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().readIoin();
+				} catch (Exception e1) {
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcIoinRead, "8, 7");
         
         JLabel lblNewLabel_48 = new JLabel("Returns version (0x11)");
@@ -397,10 +415,9 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         btnTmcIhrWrite.addActionListener(new ActionListener() {
         	public void actionPerformed(ActionEvent e) {
         		try {
-					driver.getTmc2130().setIhr();
+					driver.getTmc2130().writeIholdDelay();
 				} catch (Exception e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 				}
         	}
         });
@@ -446,6 +463,15 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         txtTmcTpowerdown.setColumns(10);
         
         JButton btnTmcTpowerdownWrite = new JButton("Write TPOWERDOWN");
+        btnTmcTpowerdownWrite.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().writeTpowerDown();
+				} catch (Exception e1) {
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcTpowerdownWrite, "8, 11");
         
         JLabel lblNewLabel_3 = new JLabel("(Seconds) Sets the delay time after stand still (stst) of the motor to motor current power down.");
@@ -465,6 +491,15 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         txtTmcTstep.setColumns(10);
         
         JButton btnTmcTstepWrite = new JButton("Read TSTEP");
+        btnTmcTstepWrite.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().readTstep();
+				} catch (Exception e1) {
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcTstepWrite, "8, 12");
         
         JLabel lblNewLabel_4 = new JLabel("Actual measured time between two 1/256 microsteps derived from the step input frequency in units of 1/fCLK. Measured value is (2^20)-1 in case of overflow or stand still.");
@@ -484,6 +519,15 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         txtTmcPwmThrs.setColumns(10);
         
         JButton btnTpwmthrsWrite = new JButton("Write TPWMTHRS");
+        btnTpwmthrsWrite.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().writeTpwmThrs();
+				} catch (Exception e1) {
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+				}
+        	}
+        });
         panelTmc2130.add(btnTpwmthrsWrite, "8, 13");
         
         JLabel lblNewLabel_5 = new JLabel("This is the upper velocity for stealthChop voltage PWM mode.");
@@ -503,6 +547,15 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         txtTmcTcoolthrs.setColumns(10);
         
         JButton btnTmcTcoolthrsWrite = new JButton("Write TCOOLTHRS");
+        btnTmcTcoolthrsWrite.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().writeTcoolThrs();
+				} catch (Exception e1) {
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcTcoolthrsWrite, "8, 14");
         
         JLabel lblNewLabel_6 = new JLabel("This is the lower threshold velocity for switching on smart energy coolStep and stallGuard feature. (unsigned)");
@@ -522,6 +575,16 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         txtTmcThigh.setColumns(10);
         
         JButton btnTmcThighWrite = new JButton("Write THIGH");
+        btnTmcThighWrite.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().writeThigh();
+				} catch (Exception e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcThighWrite, "8, 15");
         
         JLabel lblNewLabel_7 = new JLabel("Allows velocity dependent switching into a different chopper mode and fullstepping to maximize torque. (unsigned)");
@@ -543,10 +606,9 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         btnTmcChopconfWrite.addActionListener(new ActionListener() {
         	public void actionPerformed(ActionEvent e) {
         		try {
-					driver.getTmc2130().setChopConf();
+					driver.getTmc2130().writeChopConf();
 				} catch (Exception e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 				}
         	}
         });
@@ -755,10 +817,9 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         btnTmcCoolconfWrite.addActionListener(new ActionListener() {
         	public void actionPerformed(ActionEvent e) {
         		try {
-					driver.getTmc2130().setCoolConf();
+					driver.getTmc2130().writeCoolConf();
 				} catch (Exception e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
+	                JOptionPane.showMessageDialog(null, e1.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 				}
         	}
         });
@@ -851,6 +912,16 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         panelTmc2130.add(chkTmcDrvstatusStst, "6, 39");
         
         JButton btnTmcDrvstatusRead = new JButton("Read DRV_STATUS");
+        btnTmcDrvstatusRead.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().readDrvStatus();
+				} catch (Exception e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcDrvstatusRead, "8, 39, 1, 11");
         
         JLabel lblNewLabel_9 = new JLabel("standstill indicator");
@@ -980,6 +1051,16 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         txtTmcPwmconfAmpl.setColumns(10);
         
         JButton btnTmcPwmconfWrite = new JButton("Write PWMCONF");
+        btnTmcPwmconfWrite.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().writePwmConf();
+				} catch (Exception e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcPwmconfWrite, "8, 50, 1, 6");
         
         JLabel lblNewLabel_10 = new JLabel("User defined amplitude (offset)");
@@ -1055,6 +1136,16 @@ public class FireStepDriverWizard  extends AbstractSerialPortDriverConfiguration
         txtTmcPwmscale.setColumns(10);
         
         JButton btnTmcPwmscaleRead = new JButton("Read PWM_SCALE");
+        btnTmcPwmscaleRead.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		try {
+					driver.getTmc2130().readPwmScale();
+				} catch (Exception e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+        	}
+        });
         panelTmc2130.add(btnTmcPwmscaleRead, "8, 56");
         
         JLabel lblNewLabel_32 = new JLabel("Actual PWM scaler (255 = max voltage)");

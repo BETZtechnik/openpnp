@@ -1,8 +1,12 @@
 package org.firepick.driver;
 
+import java.util.List;
+
 import org.openpnp.gui.support.BoundProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.gson.JsonObject;
 
 public class Tmc2130 {
 	// CHOPCONF -> MRES - Micro-step resolution
@@ -311,8 +315,7 @@ public class Tmc2130 {
 		}
 	}
 
-	public void setChopConf() throws Exception {
-		int chopconf = buildChopconf(this.chopConf);
+	public void setChopConf(int chopconf) throws Exception {
 	    logger.trace(String.format("FireStep: TMC2130 set CHOPCONF to %d", chopconf ));
         try {
         	driver.sendJsonCommand(String.format("{'tmccconf':%s}", chopconf));
@@ -321,8 +324,7 @@ public class Tmc2130 {
 			e.printStackTrace();
 		}
 	}
-	public void setGconf() throws Exception {
-		int gConf = buildGconf(this.gConf);
+	public void setGconf(int gConf) throws Exception {
 	    logger.trace(String.format("FireStep: TMC2130 set GCONF to %d", gConf ));
         try {
         	driver.sendJsonCommand(String.format("{'tmcgconf':%s}", gConf));
@@ -331,8 +333,7 @@ public class Tmc2130 {
 			e.printStackTrace();
 		}
 	}
-	public void setPwmConf() throws Exception {
-		int pwmconf = buildPwmconf(this.pwmConf);
+	public void setPwmConf(int pwmconf) throws Exception {
 	    logger.trace(String.format("FireStep: TMC2130 set PWMCONF to %d", pwmconf ));
         try {
         	driver.sendJsonCommand(String.format("{'tmcpconf':%s}", pwmconf));
@@ -341,8 +342,7 @@ public class Tmc2130 {
 			e.printStackTrace();
 		}
 	}
-	public void setCoolConf() throws Exception {
-		int coolconf = buildCoolconf(this.coolConfig);
+	public void setCoolConf(int coolconf) throws Exception {
 	    logger.trace(String.format("FireStep: TMC2130 set COOLCONF to %d", coolconf ));
         try {
         	driver.sendJsonCommand(String.format("{'tmcccoolc':%s}", coolconf));
@@ -351,8 +351,7 @@ public class Tmc2130 {
 			e.printStackTrace();
 		}
 	}
-	public void setIhr() throws Exception {
-		int ihr = buildIhr(this.ihr);
+	public void setIhr(int ihr) throws Exception {
 	    logger.trace(String.format("FireStep: TMC2130 set IHR to %d", ihr ));
         try {
         	driver.sendJsonCommand(String.format("{'tmcihr':%s}", ihr));
@@ -399,6 +398,96 @@ public class Tmc2130 {
 			e.printStackTrace();
 		}
 	    logger.trace(String.format("FireStep: TMC2130 get PWM_SCALE: x=%d, y=%d, z=%d", pwmScaleX, pwmScaleY, pwmScaleZ ));
+	}
+	
+	
+	
+	
+	// These are the methods that are called as actions from the wizard.
+	public void writeGconf() throws Exception {
+    	driver.sendJsonCommand(String.format("{'tmcgconf':%d}", buildGconf(this.gConf)));
+    	// Error: -402
+	}
+	
+	public void readGstat() throws Exception {
+		JsonObject response = driver.sendJsonCommand(String.format("{'tmcgstat':''}")).get(0);
+		// Error: -402
+	}
+	
+	public void readIoin() throws Exception {
+		JsonObject response = driver.sendJsonCommand(String.format("{'tmcvers':''}")).get(0);
+		// Error: -402
+	}
+	
+	public void writeIholdDelay() throws Exception {
+    	driver.sendJsonCommand(String.format("{'tmcihr':%d}", buildIhr(this.ihr)));
+    	// Error: -402
+	}
+	
+	public void writeTpowerDown() throws Exception {
+    	driver.sendJsonCommand(String.format("{'tmctpwrdn':%d}", this.tPowerDown.getValue()));
+    	// Responds with plain text, breaking JSON protocol.
+    	// '{"s":0,"r":{"tmctpwrdn":0},"t":0.001} '
+	}
+	
+	public void readTstep() throws Exception {
+		JsonObject response = driver
+				.sendJsonCommand(String.format("{'tmctstep':''}"))
+				.get(0)
+				.get("r")
+				.getAsJsonObject()
+				.get("tmctstep")
+				.getAsJsonObject();
+		// {"tmctstep":""} => {"s":0,"r":{"tmctstep":{"x":65535,"y":65535,"z":65535}},"t":0.031}
+		this.tStep.setValue(response.get("x").getAsInt());
+	}
+	
+	public void writeTpwmThrs() throws Exception {
+    	driver.sendJsonCommand(String.format("{'tmctpwmth':%d}", this.tPwmThrs.getValue()));    	
+    	// Responds with plain text, breaking JSON protocol.
+	}
+	
+	public void writeTcoolThrs() throws Exception {
+    	driver.sendJsonCommand(String.format("{'tmctcthrs':%d}", this.tCoolThrs.getValue()));
+    	// Error: -402
+	}
+	
+	public void writeThigh() throws Exception {
+    	driver.sendJsonCommand(String.format("{'tmcthigh':%d}", this.tHigh.getValue()));
+    	// Responds with plain text, breaking JSON protocol.
+    	// {"tmctcthrs":0} => [{"s":-402,"r":{"tmctcthrs":0},"e":"tmctcth","t":0.001}]
+	}
+	
+	public void writeChopConf() throws Exception {
+    	driver.sendJsonCommand(String.format("{'tmccconf':%d}", buildChopconf(this.chopConf)));
+    	// Responds with plain text, breaking JSON protocol.
+	}
+	
+	public void writeCoolConf() throws Exception {
+    	driver.sendJsonCommand(String.format("{'tmccoolc':%d}", buildCoolconf(this.coolConfig)));
+    	// Error: -402
+	}
+	
+	public void readDrvStatus() throws Exception {
+		JsonObject response = driver.sendJsonCommand(String.format("{'tmcdrvst':''}")).get(0);
+		// Error: -402
+	}
+	
+	public void writePwmConf() throws Exception {
+    	driver.sendJsonCommand(String.format("{'tmcpconf':%d}", buildPwmconf(this.pwmConf)));
+    	// Responds with plain text, breaking JSON protocol.
+	}
+	
+	public void readPwmScale() throws Exception {
+		JsonObject response = driver
+				.sendJsonCommand(String.format("{'tmcpscale':''}"))
+				.get(0)
+				.get("r")
+				.getAsJsonObject()
+				.get("tmcpscale")
+				.getAsJsonObject();
+		// {'tmcpscale':''} => {"s":0,"r":{"tmcpscale":{"x":255,"y":255,"z":255}},"t":0.031}
+		this.pwmScale.setValue(response.get("x").getAsInt());
 	}
 } 
 // End TMC2130

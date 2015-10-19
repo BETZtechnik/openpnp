@@ -14,7 +14,6 @@ public class BoundProperty<T> extends AbstractModelObject {
 	}
 	
 	public void setValue(T value) {
-		System.out.println(value);
 		T oldValue = this.value;
 		this.value = value;
 		firePropertyChange("value", oldValue, value);
