@@ -22,6 +22,7 @@
 package org.firepick.delta;
 
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -518,21 +519,32 @@ public class FpdPnPJobProcessor extends AbstractJobProcessor {
         
         BufferedImage backgroundImage = bottomVisionBackgroundImages.get(part.getHeight());
         
-        for (int i = 0; i < 3; i++) {
+        File debugDir = new File("/Users/jason/Desktop/debug/" + System.currentTimeMillis());
+        debugDir.mkdirs();
+        
+        for (int i = 0; i < 6; i++) {
+        	File backgroundFile = new File(debugDir, i + "_background.png");
+        	File foregroundFile = new File(debugDir, i + "_foreground.png");
+        	File absDiffFile = new File(debugDir, i + "_asdiff.png");
+        	File processedFile = new File(debugDir, i + "_processed.png");
+        	
             List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
             List<RotatedRect> rects = new ArrayList<RotatedRect>();
             BufferedImage filteredImage = new FluentCv()
             	.setCamera(camera)
             	
             	.toMat(backgroundImage)
+            	.write(backgroundFile)
             	.toGray()
             	.blurGaussian(3, "background")
             	
             	.settleAndCapture("original")
+            	.write(foregroundFile)
             	.toGray()
             	.blurGaussian(3)
             	
             	.absDiff("background")
+            	.write(absDiffFile)
             	
     			.blurGaussian(13)
     			.findEdgesRobertsCross()
@@ -542,6 +554,7 @@ public class FpdPnPJobProcessor extends AbstractJobProcessor {
     			.drawContours(contours, null, 1)
     			.getContourMaxRects(contours, rects)
     			.drawRects(rects, null, 2)
+            	.write(processedFile)
             	.toBufferedImage();
             
             CameraView cameraView = MainFrame.mainFrame.cameraPanel.getCameraView(camera);
@@ -571,7 +584,8 @@ public class FpdPnPJobProcessor extends AbstractJobProcessor {
                 }
             }
             // Set the angle on the offsets.
-            offsets = offsets.derive(null, null, null, -angle);
+            offsets = offsets.derive(null, null, null, angle);
+            System.out.println("offsets " + offsets);
             
             // Move the nozzle so that the part is oriented correctly over the
             // camera.

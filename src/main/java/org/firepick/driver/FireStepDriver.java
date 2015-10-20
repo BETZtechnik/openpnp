@@ -462,16 +462,28 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 	@Override
 	public void pick(ReferenceNozzle nozzle) throws Exception {
 		setRotMotorEnable(true); // Enable the nozzle rotation
+		// wait a tick for the motor to settle down from being enabled. it tends
+		// to twitch a little when it's first enabled
+		Thread.sleep(250);
+		
 		enableVacuumPump(true);  // Enable the pump
 	}
 	
 	@Override
 	public void place(ReferenceNozzle nozzle) throws Exception {
 		enableVacuumPump(false);
-		setRotMotorEnable(false);
+		
+		// TODO: this is a temporary hack which turns on a vacuum exhaust
+		// solenoid for a short time to quickly vent the vacuum. This will need
+		// to be changed to some other pin when we're actually using both
+		// the dispenser and the nozzle at the same time.
         enableDispenser(true);
-        Thread.sleep(1000);
+        Thread.sleep(250);
         enableDispenser(false);
+
+        // disable the rotation motor last so that it doesn't twitch the part
+        // out of place.
+        setRotMotorEnable(false);
 	}
 	
 	public synchronized void connect()
