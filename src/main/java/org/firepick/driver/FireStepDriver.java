@@ -687,10 +687,12 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
 
         double bed_level[][] = new double[ACCURATE_BED_LEVELING_POINTS][ACCURATE_BED_LEVELING_POINTS];
         
+        int averageCount = 0; // if > 0 run the probe averageCount + averageSkip times and average the last averageCount points.
+        int averageSkip = 4; // when averaging is enabled with averageCount skip averageSkip probes before recording readings.
+        
         // First, do a probe at 0,0 to determine the approximate bed height and then work
         // slightly above it.
-        Location startLocation = probePoint(hm, hm.getLocation().derive(0d, 0d, null, null));
-        startLocation = startLocation.add(new Location(LengthUnit.Millimeters, 0, 0, 20, 0));
+        Location startLocation = hm.getLocation(); 
 
         for (int yCount = 0; yCount < ACCURATE_BED_LEVELING_POINTS; yCount++) {
             double yProbe = FRONT_PROBE_BED_POSITION
@@ -712,11 +714,30 @@ public class FireStepDriver extends AbstractSerialPortDriver implements Runnable
                 // Avoid probing the corners (outside the round or hexagon print surface) on a delta printer.
                 double distance_from_center = Math.sqrt(xProbe * xProbe + yProbe * yProbe);
                 if (distance_from_center <= DELTA_PROBABLE_RADIUS) {
-                    // Now do the Z probe
-                    Location probedLocation = new Location(LengthUnit.Millimeters, xProbe, yProbe, startLocation.getZ(), 0);
-                    double measured_z = 0;
-                    measured_z = probePoint(hm, probedLocation).getZ();
-                    bed_level[xCount][yCount] = measured_z;
+                	if (averageCount > 0) {
+                      // Now do the Z probe
+                    	List<Double> measures = new ArrayList<>();
+                    	for (int i = 0; i < averageCount + averageSkip; i++) {
+                        	Location probeLocation = new Location(LengthUnit.Millimeters, xProbe, yProbe, startLocation.getZ(), 0);
+                            double measured_z = probePoint(hm, probeLocation).getZ();
+                            if (i >= averageSkip) {
+                                measures.add(measured_z);
+                            }
+                    	}
+                    	double average = 0;
+                    	for (int i = 0; i < measures.size(); i++) {
+                    		average += measures.get(i);
+                    	}
+                    	average /= measures.size();
+                        bed_level[xCount][yCount] = average;
+                	}
+                	else {
+                        // Now do the Z probe
+                    	Location probeLocation = new Location(LengthUnit.Millimeters, xProbe, yProbe, startLocation.getZ(), 0);
+                        double measured_z = probePoint(hm, probeLocation).getZ();
+                        bed_level[xCount][yCount] = measured_z;
+                	}
+                    
                 }
                 else {
                     bed_level[xCount][yCount] = Double.NaN;
